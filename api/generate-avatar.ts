@@ -1,6 +1,4 @@
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 export const config = {
   runtime: 'edge',
 };
@@ -17,24 +15,16 @@ export default async function handler(req: Request) {
       return new Response(JSON.stringify({ error: 'Prompt is required' }), { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'Configuração incompleta no servidor' }), { status: 500 });
-    }
-
-    // O prompt original da usuária para o estilo 3D Clay
+    // O prompt mestre da usuária para o estilo 3D Clay
     const finalPrompt = `A cute circular profile sticker in 3D clay style, white background, centered. Subject: ${prompt}. Educational and safe for children.`;
 
-    // Para evitar erros de timeout e garantir que a usuária veja a imagem fofinha que ela quer,
-    // vamos usar o motor de geração de imagem Pollinations com o prompt específico da usuária.
-    // O Pollinations é compatível com o estilo "clay" e gera resultados instantâneos que a Vercel aceita sem travar.
+    // Geramos um SEED único para cada clique. Isso é o que impede o navegador de ficar "preso" na imagem anterior (como o Panda).
+    const uniqueSeed = Math.floor(Math.random() * 9999999);
     
     const encodedPrompt = encodeURIComponent(finalPrompt);
-    // Adicionamos parâmetros para forçar a qualidade e o estilo 3D
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 1000000)}`;
+    // Adicionamos o seed na URL para forçar o navegador a carregar a nova imagem criada pela IA
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true&seed=${uniqueSeed}`;
 
-    // Removido qualquer fallback para a galeria interna. 
-    // Se chegar aqui, ele VAI retornar a imagem gerada pela IA.
     return new Response(JSON.stringify({ 
       message: "Mágica realizada!",
       avatarUrl: imageUrl
@@ -42,7 +32,9 @@ export default async function handler(req: Request) {
       status: 200,
       headers: { 
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       }
     });
 
