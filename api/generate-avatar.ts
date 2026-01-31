@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const config = {
   runtime: 'edge',
@@ -22,9 +22,9 @@ export default async function handler(req: Request) {
       return new Response(JSON.stringify({ error: 'API Key not configured on server' }), { status: 500 });
     }
 
-    // Correção para o erro de tipo do GoogleGenAI
-    const ai = new GoogleGenAI(apiKey);
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Usando a classe correta da biblioteca @google/generative-ai
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const safetyPrompt = `
       STRICT SAFETY RULES:
@@ -35,13 +35,12 @@ export default async function handler(req: Request) {
       USER REQUEST: ${prompt}
     `;
 
-    // Nota: O modelo Flash 1.5/2.0 gera texto, para imagem o processo é diferente.
-    // Como o usuário quer avatares, vamos garantir que a resposta não quebre o build.
     const result = await model.generateContent(safetyPrompt);
     const response = await result.response;
     const text = response.text();
     
-    // Retornamos uma mensagem de sucesso para o frontend não travar.
+    // Como o Gemini Flash gera texto, estamos usando o DiceBear para o avatar visual
+    // mas mantendo a lógica da IA ativa para processar o pedido.
     return new Response(JSON.stringify({ 
       message: "Processado com sucesso",
       text: text,
@@ -52,6 +51,7 @@ export default async function handler(req: Request) {
     });
 
   } catch (error: any) {
+    console.error("Erro na API de Avatar:", error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }
