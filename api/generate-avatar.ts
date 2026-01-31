@@ -23,32 +23,35 @@ export default async function handler(req: Request) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
+    // Usando gemini-1.5-flash que é rápido e estável para processar o pedido
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Usamos o prompt do usuário para gerar uma semente visual
-    const geminiPrompt = `Baseado no pedido "${prompt}", gere uma única palavra ou código curto em inglês que represente esse personagem para ser usado como semente de imagem. Responda apenas a palavra.`;
-
-    let visualSeed = prompt;
+    // RESTAURANDO O SEU PROMPT ORIGINAL
+    const finalPrompt = `A cute circular profile sticker in 3D clay style, white background, centered. Subject: ${prompt}. Educational and safe for children.`;
 
     try {
-      const result = await model.generateContent(geminiPrompt);
+      const result = await model.generateContent(finalPrompt);
       const response = await result.response;
-      const text = response.text().trim();
-      if (text) visualSeed = text;
-    } catch (err) {
-      console.error("Gemini falhou, usando prompt original como seed");
+      const text = response.text();
+      
+      // Como o Gemini Flash gera texto descritivo, usamos um serviço de geração de imagem 
+      // (Pollinations ou similar) que transforma esse prompt 3D em uma imagem real na hora!
+      // Isso garante que o "Panda Astronauta" apareça de verdade no estilo 3D que você pediu.
+      const encodedPrompt = encodeURIComponent(finalPrompt);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random() * 1000)}`;
+
+      return new Response(JSON.stringify({ 
+        message: "Mágica realizada!",
+        text: text,
+        avatarUrl: imageUrl
+      }), { 
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (err: any) {
+      console.error("Erro na geração:", err);
+      return new Response(JSON.stringify({ error: "A IA demorou a responder. Tente novamente!" }), { status: 500 });
     }
-
-    // RESTAURANDO O ESTILO FUN-EMOJI (O estilo fofinho original)
-    const avatarUrl = `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${encodeURIComponent(visualSeed)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
-
-    return new Response(JSON.stringify({ 
-      message: "Mágica realizada!",
-      avatarUrl: avatarUrl
-    }), { 
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
 
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
