@@ -1,3 +1,4 @@
+
 {
   "name": "álbum-digital-de-figurinhas-escolares",
   "private": true,
@@ -13,7 +14,8 @@
     "react-dom": "^19.2.4",
     "lucide-react": "^0.563.0",
     "canvas-confetti": "^1.9.4",
-    "@google/genai": "^1.38.0"
+    "@google/genai": "^0.21.0",
+    "@vercel/kv": "^1.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
