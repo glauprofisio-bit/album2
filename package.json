@@ -13,8 +13,8 @@
     "react-dom": "^18.2.0",
     "lucide-react": "^0.284.0",
     "canvas-confetti": "^1.6.0",
-    "@google/genai": "^0.21.0",
-    "@vercel/kv": "^1.0.1"
+    "@google/genai": "latest",
+    "@vercel/kv": "latest"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
@@ -24,4 +24,3 @@
     "vite": "^4.4.0"
   }
 }
-
