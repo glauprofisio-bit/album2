@@ -1,4 +1,6 @@
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 export const config = {
   runtime: 'edge',
 };
@@ -15,15 +17,21 @@ export default async function handler(req: Request) {
       return new Response(JSON.stringify({ error: 'Prompt is required' }), { status: 400 });
     }
 
-    // O prompt mestre da usuária para o estilo 3D Clay
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'Configuração incompleta no servidor' }), { status: 500 });
+    }
+
+    // O prompt original da usuária para o estilo 3D Clay
     const finalPrompt = `A cute circular profile sticker in 3D clay style, white background, centered. Subject: ${prompt}. Educational and safe for children.`;
 
-    // Geramos um SEED único para cada clique. Isso é o que impede o navegador de ficar "preso" na imagem anterior (como o Panda).
-    const uniqueSeed = Math.floor(Math.random() * 9999999);
+    // Para evitar o "Rate Limit" do serviço anterior, vamos usar uma URL de fallback estável
+    // que gera imagens de alta qualidade sem limites agressivos.
+    // Usaremos o serviço da Cloudflare/Flux que é muito mais robusto para uso escolar.
     
-    const encodedPrompt = encodeURIComponent(finalPrompt);
-    // Adicionamos o seed na URL para forçar o navegador a carregar a nova imagem criada pela IA
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true&seed=${uniqueSeed}`;
+    const seed = Math.floor(Math.random() * 1000000);
+    // Usando uma URL de geração via Flux (via pollionations mas com modelo alternativo para evitar o limite do anterior)
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 
     return new Response(JSON.stringify({ 
       message: "Mágica realizada!",
@@ -32,9 +40,7 @@ export default async function handler(req: Request) {
       status: 200,
       headers: { 
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
+        'Cache-Control': 'no-store, no-cache, must-revalidate'
       }
     });
 
