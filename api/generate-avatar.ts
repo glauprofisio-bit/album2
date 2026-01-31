@@ -25,10 +25,10 @@ export default async function handler(req: Request) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Criamos um prompt para o Gemini gerar uma "semente" criativa baseada no pedido do usuário
-    const geminiPrompt = `Baseado no pedido "${prompt}", gere apenas 3 palavras em inglês que descrevam visualmente esse personagem para serem usadas como semente de geração de imagem. Exemplo: "cute space cat". Responda apenas as palavras.`;
+    // Usamos o prompt do usuário para gerar uma semente visual
+    const geminiPrompt = `Baseado no pedido "${prompt}", gere uma única palavra ou código curto em inglês que represente esse personagem para ser usado como semente de imagem. Responda apenas a palavra.`;
 
-    let visualSeed = prompt; // Fallback para o próprio prompt do usuário
+    let visualSeed = prompt;
 
     try {
       const result = await model.generateContent(geminiPrompt);
@@ -39,9 +39,8 @@ export default async function handler(req: Request) {
       console.error("Gemini falhou, usando prompt original como seed");
     }
 
-    // Usamos o estilo 'bottts-neutral' ou 'avataaars' ou 'lorelei' que são mais fofinhos e variados
-    // 'lorelei' é excelente para personagens fofinhos estilo desenho
-    const avatarUrl = `https://api.dicebear.com/9.x/lorelei/svg?seed=${encodeURIComponent(visualSeed)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+    // RESTAURANDO O ESTILO FUN-EMOJI (O estilo fofinho original)
+    const avatarUrl = `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${encodeURIComponent(visualSeed)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
 
     return new Response(JSON.stringify({ 
       message: "Mágica realizada!",
