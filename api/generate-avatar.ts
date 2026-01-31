@@ -19,46 +19,37 @@ export default async function handler(req: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error("ERRO: GEMINI_API_KEY não encontrada nas variáveis de ambiente.");
       return new Response(JSON.stringify({ error: 'Configuração incompleta no servidor' }), { status: 500 });
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Usando o modelo mais leve e rápido para evitar timeouts na Vercel
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const safetyPrompt = `Crie uma descrição curta e fofa de um avatar estilo figurinha (sticker) 3D baseado no pedido: ${prompt}. Responda apenas com a descrição.`;
+    // Criamos um prompt para o Gemini gerar uma "semente" criativa baseada no pedido do usuário
+    const geminiPrompt = `Baseado no pedido "${prompt}", gere apenas 3 palavras em inglês que descrevam visualmente esse personagem para serem usadas como semente de geração de imagem. Exemplo: "cute space cat". Responda apenas as palavras.`;
 
-    // Timeout de segurança para a API não travar
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    let visualSeed = prompt; // Fallback para o próprio prompt do usuário
 
     try {
-      const result = await model.generateContent(safetyPrompt);
+      const result = await model.generateContent(geminiPrompt);
       const response = await result.response;
-      const text = response.text();
-      clearTimeout(timeoutId);
-
-      // Geramos um avatar visual baseado em um "seed" aleatório para garantir que sempre funcione
-      const randomSeed = Math.random().toString(36).substring(7);
-      const avatarUrl = `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${randomSeed}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
-
-      return new Response(JSON.stringify({ 
-        message: "Mágica realizada!",
-        text: text,
-        avatarUrl: avatarUrl
-      }), { 
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    } catch (err: any) {
-      console.error("Erro na geração do Gemini:", err);
-      // Fallback amigável se o Gemini falhar
-      return new Response(JSON.stringify({ 
-        message: "Mágica simplificada!",
-        avatarUrl: `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${Math.random().toString(36).substring(7)}`
-      }), { status: 200 });
+      const text = response.text().trim();
+      if (text) visualSeed = text;
+    } catch (err) {
+      console.error("Gemini falhou, usando prompt original como seed");
     }
+
+    // Usamos o estilo 'bottts-neutral' ou 'avataaars' ou 'lorelei' que são mais fofinhos e variados
+    // 'lorelei' é excelente para personagens fofinhos estilo desenho
+    const avatarUrl = `https://api.dicebear.com/9.x/lorelei/svg?seed=${encodeURIComponent(visualSeed)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+
+    return new Response(JSON.stringify({ 
+      message: "Mágica realizada!",
+      avatarUrl: avatarUrl
+    }), { 
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
 
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
