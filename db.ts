@@ -19,6 +19,7 @@ export const initialData: AppData = {
 };
 
 export const loadData = (): AppData => {
+  if (typeof window === 'undefined') return initialData;
   const saved = localStorage.getItem(DB_KEY);
   if (saved) {
     try {
@@ -31,6 +32,7 @@ export const loadData = (): AppData => {
 };
 
 export const saveData = async (data: AppData) => {
+  if (typeof window === 'undefined') return;
   localStorage.setItem(DB_KEY, JSON.stringify(data));
   
   try {
@@ -50,7 +52,9 @@ export const syncWithCloud = async (): Promise<AppData | null> => {
     if (response.ok) {
       const cloudData = await response.json();
       if (cloudData && Object.keys(cloudData).length > 0) {
-        localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+        }
         return cloudData;
       }
     }
@@ -61,6 +65,8 @@ export const syncWithCloud = async (): Promise<AppData | null> => {
 };
 
 export const clearData = () => {
-  localStorage.removeItem(DB_KEY);
-  window.location.reload();
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(DB_KEY);
+    window.location.reload();
+  }
 };

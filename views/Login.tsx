@@ -1,47 +1,67 @@
 
 import React, { useState } from 'react';
 import { User, UserRole, AppData } from '../types';
-import { KeyRound, Users, UserCircle, Sparkles, Star, Trophy, Zap, GraduationCap } from 'lucide-react';
+import { syncWithCloud } from '../db';
+import { KeyRound, Users, UserCircle, Sparkles, Star, Trophy, Zap, GraduationCap, Loader2 } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (user: User) => void;
   appData: AppData;
+  onSync: (data: AppData) => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, appData, onSync }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoggingIn(true);
 
-    if (selectedRole === UserRole.ADMIN) {
-      if (login === 'Glau' && password === 'Smart200#') {
-        onLogin({ id: 'admin', name: 'Administrador Glau', email: 'admin@escola.com', login: 'Glau', role: UserRole.ADMIN });
-        return;
+    const tryLogin = (currentData: AppData) => {
+      if (selectedRole === UserRole.ADMIN) {
+        if (login === 'Glau' && password === 'Smart200#') {
+          return { id: 'admin', name: 'Administrador Glau', email: 'admin@escola.com', login: 'Glau', role: UserRole.ADMIN };
+        }
+      }
+
+      if (selectedRole === UserRole.PROFESSOR) {
+        return currentData.professors.find(p => p.login === login && p.password === password);
+      }
+
+      if (selectedRole === UserRole.ALUNO) {
+        return currentData.students.find(s => s.login === login && s.password === password);
+      }
+      return null;
+    };
+
+    // 1. Tenta login com dados locais primeiro
+    let user = tryLogin(appData);
+
+    // 2. Se falhar, tenta sincronizar com a nuvem e tenta de novo
+    if (!user) {
+      try {
+        const cloudData = await syncWithCloud();
+        if (cloudData) {
+          onSync(cloudData);
+          user = tryLogin(cloudData);
+        }
+      } catch (e) {
+        console.error("Erro ao sincronizar durante login:", e);
       }
     }
 
-    if (selectedRole === UserRole.PROFESSOR) {
-      const prof = appData.professors.find(p => p.login === login && p.password === password);
-      if (prof) {
-        onLogin(prof);
-        return;
-      }
+    if (user) {
+      onLogin(user);
+    } else {
+      setError('Login ou senha incorretos! Verifique os dados e tente novamente.');
     }
-
-    if (selectedRole === UserRole.ALUNO) {
-      const student = appData.students.find(s => s.login === login && s.password === password);
-      if (student) {
-        onLogin(student);
-        return;
-      }
-    }
-
-    setError('Login ou senha incorretos!');
+    
+    setIsLoggingIn(false);
   };
 
   return (
@@ -61,10 +81,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
       </div>
 
       <div className="w-full max-w-xl z-10">
-        {/* Container Principal Estilo Card de Colecionador */}
         <div className="bg-white rounded-[4rem] p-10 md:p-16 border-[12px] border-indigo-950 shadow-[0_20px_0_0_rgba(30,27,75,1)] relative overflow-hidden">
           
-          {/* Header da Capa */}
           <div className="flex flex-col items-center mb-16 relative">
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-400 rounded-full border-8 border-indigo-950 flex items-center justify-center -rotate-12 shadow-xl z-20">
                <span className="font-black text-indigo-950 text-xl leading-none text-center">NOVA<br/>EDIÇÃO</span>
@@ -163,6 +181,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
                     className="w-full p-6 rounded-[2rem] border-[6px] border-indigo-950 bg-slate-50 focus:bg-white outline-none transition-all font-black text-indigo-950 text-lg placeholder:opacity-20 shadow-inner"
                     placeholder="Ex: jaozinho123"
                     required
+                    disabled={isLoggingIn}
                   />
                 </div>
 
@@ -175,6 +194,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
                     className="w-full p-6 rounded-[2rem] border-[6px] border-indigo-950 bg-slate-50 focus:bg-white outline-none transition-all font-black text-indigo-950 text-lg placeholder:opacity-20 shadow-inner"
                     placeholder="••••••••"
                     required
+                    disabled={isLoggingIn}
                   />
                 </div>
               </div>
@@ -183,9 +203,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
 
               <button 
                 type="submit"
-                className="w-full py-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-[2.5rem] shadow-[0_12px_0_0_rgba(30,27,75,1)] transform active:scale-95 active:translate-y-1 active:shadow-none transition-all text-2xl uppercase italic tracking-tighter border-[8px] border-indigo-950"
+                disabled={isLoggingIn}
+                className="w-full py-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-[2.5rem] shadow-[0_12px_0_0_rgba(30,27,75,1)] transform active:scale-95 active:translate-y-1 active:shadow-none transition-all text-2xl uppercase italic tracking-tighter border-[8px] border-indigo-950 flex items-center justify-center gap-3"
               >
-                Entrar no Álbum
+                {isLoggingIn ? (
+                  <><Loader2 className="animate-spin" size={24} /> Entrando...</>
+                ) : (
+                  'Entrar no Álbum'
+                )}
               </button>
             </form>
           )}
