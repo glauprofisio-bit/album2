@@ -1,4 +1,6 @@
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 export const config = {
   runtime: 'edge',
 };
@@ -15,14 +17,24 @@ export default async function handler(req: Request) {
       return new Response(JSON.stringify({ error: 'Prompt is required' }), { status: 400 });
     }
 
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'Configuração incompleta no servidor' }), { status: 500 });
+    }
+
     // O prompt original da usuária para o estilo 3D Clay
     const finalPrompt = `A cute circular profile sticker in 3D clay style, white background, centered. Subject: ${prompt}. Educational and safe for children.`;
 
-    // Usamos o Pollinations diretamente para gerar a imagem baseada no prompt 3D da usuária.
-    // Isso é instantâneo e evita os erros de timeout/processamento do Gemini que estavam travando o site.
+    // Para evitar erros de timeout e garantir que a usuária veja a imagem fofinha que ela quer,
+    // vamos usar o motor de geração de imagem Pollinations com o prompt específico da usuária.
+    // O Pollinations é compatível com o estilo "clay" e gera resultados instantâneos que a Vercel aceita sem travar.
+    
     const encodedPrompt = encodeURIComponent(finalPrompt);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random() * 1000000)}`;
+    // Adicionamos parâmetros para forçar a qualidade e o estilo 3D
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 1000000)}`;
 
+    // Removido qualquer fallback para a galeria interna. 
+    // Se chegar aqui, ele VAI retornar a imagem gerada pela IA.
     return new Response(JSON.stringify({ 
       message: "Mágica realizada!",
       avatarUrl: imageUrl
