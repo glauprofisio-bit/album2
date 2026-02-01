@@ -1,90 +1,54 @@
-import { AppData, UserRole, Sticker } from './types';
-
-const DB_KEY = 'album_figurinhas_db';
-const DB_VERSION_KEY = 'album_db_version';
-const CURRENT_DB_VERSION = '1.0.5';
+import { supabase } from './supabaseClient';
+import { AppData, Sticker } from './types';
 
 const emptyStickers: Sticker[] = Array.from({ length: 45 }, (_, i) => ({
   id: `sticker-${i + 1}`,
   week: i + 1,
   name: i + 1 >= 42 ? `Elo Supremo - Parte ${i - 40}` : `Semana ${i + 1}`,
   imageUrl: '',
-  rarity: 'NORMAL'
+  rarity: 'NORMAL' // Isso é apenas um padrão inicial, o banco vai atualizar isso!
 }));
 
-export const initialData: AppData = {
-  professors: [],
-  students: [],
-  stickers: emptyStickers,
-  studentStickers: [],
-  currentWeek: 1
-};
-
-export const loadData = (): AppData => {
-  if (typeof window === 'undefined') return initialData;
-  const saved = localStorage.getItem(DB_KEY);
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch {
-      return initialData;
-    }
-  }
-  return initialData;
-};
-
-export const saveData = (data: AppData) => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(DB_KEY, JSON.stringify(data));
-    espelharNaNuvem(data);
-  }
-};
-
-const espelharNaNuvem = async (data: AppData) => {
+export const saveToSupabase = async (table: string, data: any) => {
   try {
-    await fetch('/api/save-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-  } catch (err) {
-    console.error("Erro ao subir para nuvem:", err);
+    const { error } = await supabase.from(table).upsert(data);
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error("Erro ao salvar:", e);
+    return false;
   }
 };
 
-export const syncWithCloud = async (): Promise<AppData | null> => {
+export const loadFromSupabase = async (table: string) => {
   try {
-    const response = await fetch('/api/load-data');
-    if (!response.ok) return null;
-    
-    const cloudData = await response.json();
-    const localData = loadData();
+    const { data, error } = await supabase.from(table).select('*');
+    if (error) throw error;
+    return data || [];
+  } catch (e) {
+    return [];
+  }
+};
 
-    // Mescla Alunos (Protege os novos criados localmente)
-    const mergedStudents = [...cloudData.students];
-    localData.students.forEach(ls => {
-      if (!mergedStudents.find(cs => cs.login === ls.login)) {
-        mergedStudents.push(ls);
-      }
-    });
+// Mantendo compatibilidade com o resto do seu app
+export const loadData = async (): Promise<AppData> => {
+  const professors = await loadFromSupabase('professors');
+  const students = await loadFromSupabase('students');
+  const stickers = await loadFromSupabase('stickers');
 
-    // Mescla progresso das Raspadinhas (Protege o "já raspei")
-    const mergedStudentStickers = [...cloudData.studentStickers];
-    localData.studentStickers.forEach(lss => {
-      const cloudSticker = mergedStudentStickers.find(css => css.alunoId === lss.alunoId && css.week === lss.week);
-      if (lss.revelada && (!cloudSticker || !cloudSticker.revelada)) {
-        if (cloudSticker) cloudSticker.revelada = true;
-        else mergedStudentStickers.push(lss);
-      }
-    });
+  return {
+    professors,
+    students,
+    stickers: stickers.length > 0 ? stickers : emptyStickers,
+    studentStickers: await loadFromSupabase('student_stickers'),
+    currentWeek: 1
+  };
+};
 
-    const finalData = {
-      ...cloudData,
-      students: mergedStudents,
-      studentStickers: mergedStudentStickers
-    };
-
-    localStorage.setItem(DB_KEY, JSON.stringify(finalData));
+export const saveData = async (data: AppData) => {
+  await saveToSupabase('professors', data.professors);
+  await saveToSupabase('students', data.students);
+};
     return finalData;
   } catch (error) {
     return null;
