@@ -5,19 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview"
-  },
-  "engines": {
-    "node": "20.x"
   },
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "lucide-react": "^0.284.0",
     "canvas-confetti": "^1.6.0",
-    "@google/generative-ai": "latest",
-    "@vercel/kv": "latest"
+    "@google/generative-ai": "latest"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
