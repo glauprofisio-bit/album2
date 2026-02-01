@@ -22,6 +22,30 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData, onSync }) => {
     setError('');
     setIsLoggingIn(true);
 
+    try {
+      // Tenta login via API primeiro (consulta Supabase)
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          login,
+          password,
+          role: selectedRole?.toLowerCase()
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.user) {
+          onLogin(data.user);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao fazer login via API:", e);
+    }
+
+    // Fallback: tenta login com dados locais
     const tryLogin = (currentData: AppData) => {
       if (selectedRole === UserRole.ADMIN) {
         if (login === 'Glau' && password === 'Smart200#') {
@@ -39,10 +63,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData, onSync }) => {
       return null;
     };
 
-    // 1. Tenta login com dados locais primeiro
     let user = tryLogin(appData);
 
-    // 2. Se falhar, tenta sincronizar com a nuvem e tenta de novo
     if (!user) {
       try {
         const cloudData = await syncWithCloud();
@@ -62,7 +84,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData, onSync }) => {
     }
     
     setIsLoggingIn(false);
-  };
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen relative overflow-hidden px-4 py-20">
