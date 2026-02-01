@@ -1,15 +1,8 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": {
-    "api/generate-avatar.js": {
-      "maxDuration": 60
-    },
-    "api/load-data.js": {
-      "maxDuration": 10
-    },
-    "api/save-data.js": {
-      "maxDuration": 10
-    }
-  }
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
