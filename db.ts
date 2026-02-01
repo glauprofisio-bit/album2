@@ -22,84 +22,71 @@ export const initialData: AppData = {
 
 export const loadData = (): AppData => {
   if (typeof window === 'undefined') return initialData;
-  
-  // Verifica versão do banco local
-  const savedVersion = localStorage.getItem(DB_VERSION_KEY);
-  if (savedVersion !== CURRENT_DB_VERSION) {
-    console.log("🔄 Versão do banco local antiga. Resetando para sincronizar com a nuvem.");
-    localStorage.setItem(DB_VERSION_KEY, CURRENT_DB_VERSION);
-    return initialData; // Retorna inicial para forçar o syncWithCloud a preencher
-  }
-
   const saved = localStorage.getItem(DB_KEY);
   if (saved) {
     try {
-      const parsed = JSON.parse(saved);
-      if (!parsed.stickers || parsed.stickers.length === 0) parsed.stickers = emptyStickers;
-      return parsed;
-    } catch (e) {
+      return JSON.parse(saved);
+    } catch {
       return initialData;
     }
   }
   return initialData;
 };
 
-export const saveData = async (data: AppData) => {
-  if (typeof window === 'undefined') return;
-  
-  localStorage.setItem(DB_KEY, JSON.stringify(data));
-  localStorage.setItem(DB_VERSION_KEY, CURRENT_DB_VERSION);
-  
+export const saveData = (data: AppData) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(DB_KEY, JSON.stringify(data));
+    espelharNaNuvem(data);
+  }
+};
+
+const espelharNaNuvem = async (data: AppData) => {
   try {
-    const response = await fetch('/api/save-data', {
+    await fetch('/api/save-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!response.ok) {
-      const errData = await response.json();
-      throw new Error(errData.details || 'Erro na nuvem');
-    }
   } catch (err) {
-    console.error("❌ Falha ao espelhar na nuvem:", err);
+    console.error("Erro ao subir para nuvem:", err);
   }
 };
 
-export const syncWithCloud = async (force = false): Promise<AppData | null> => {
+export const syncWithCloud = async (): Promise<AppData | null> => {
   try {
     const response = await fetch('/api/load-data');
     if (!response.ok) return null;
     
     const cloudData = await response.json();
-    if (!cloudData || typeof cloudData !== 'object') return null;
-
     const localData = loadData();
 
-    // Proteção contra dados vazios da nuvem
-    const cloudIsEmpty = (!cloudData.professors || cloudData.professors.length === 0) && 
-                         (!cloudData.students || cloudData.students.length === 0);
-    const localHasData = localData.professors.length > 0 || localData.students.length > 0;
+    // Mescla Alunos (Protege os novos criados localmente)
+    const mergedStudents = [...cloudData.students];
+    localData.students.forEach(ls => {
+      if (!mergedStudents.find(cs => cs.login === ls.login)) {
+        mergedStudents.push(ls);
+      }
+    });
 
-    if (localHasData && cloudIsEmpty && !force) {
-      console.warn("⚠️ Nuvem vazia detectada. Protegendo dados locais.");
-      saveData(localData); // Tenta restaurar a nuvem com o local
-      return localData;
-    }
+    // Mescla progresso das Raspadinhas (Protege o "já raspei")
+    const mergedStudentStickers = [...cloudData.studentStickers];
+    localData.studentStickers.forEach(lss => {
+      const cloudSticker = mergedStudentStickers.find(css => css.alunoId === lss.alunoId && css.week === lss.week);
+      if (lss.revelada && (!cloudSticker || !cloudSticker.revelada)) {
+        if (cloudSticker) cloudSticker.revelada = true;
+        else mergedStudentStickers.push(lss);
+      }
+    });
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
-      localStorage.setItem(DB_VERSION_KEY, CURRENT_DB_VERSION);
-    }
-    return cloudData;
+    const finalData = {
+      ...cloudData,
+      students: mergedStudents,
+      studentStickers: mergedStudentStickers
+    };
+
+    localStorage.setItem(DB_KEY, JSON.stringify(finalData));
+    return finalData;
   } catch (error) {
-    console.error("Erro na sincronização:", error);
     return null;
   }
-};
-
-export const clearData = () => {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(DB_KEY);
-  localStorage.removeItem(DB_VERSION_KEY);
-  window.location.reload();
 };
