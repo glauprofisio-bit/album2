@@ -1,7 +1,6 @@
 {
-  "rewrites": [
-    { "source": "/(?!data\\.json)(?!api/)(?!.*\\..*).*", "destination": "/index.html" }
-  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "functions": {
     "api/generate-avatar.js": {
       "maxDuration": 60
