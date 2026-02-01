@@ -48,17 +48,14 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
   const [sortOrder, setSortOrder] = useState<'presenca' | 'falta'>('falta');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  // Filtra alunos que pertencem a este professor
-  const myStudents = useMemo(
-    () => data.students.filter(s => s.professorId === user.id),
-    [data.students, user.id]
-  );
+  const myStudents = useMemo(() => data.students.filter(s => s.professorId === user.id), [data.students, user.id]);
 
   const handleAddStudent = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // id = login (evita bug de salvar raspadinha antes do sync)
     const newStudent: User = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: studentForm.login,
       name: studentForm.name,
       email: '',
       login: studentForm.login,
@@ -78,10 +75,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     e.preventDefault();
     if (!editingStudentId) return;
 
-    const updatedStudents = data.students.map(s =>
-      s.id === editingStudentId ? { ...s, ...editingStudentForm } : s
-    );
-
+    const updatedStudents = data.students.map(s => (s.id === editingStudentId ? { ...s, ...editingStudentForm } : s));
     updateData({ students: updatedStudents });
     setEditingStudentId(null);
   };
@@ -108,7 +102,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         newStickers.splice(existingIndex, 1);
       }
     }
-
     updateData({ studentStickers: newStickers });
   };
 
@@ -124,7 +117,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
       })
       .filter(s => {
         const matchCiclo = filterCiclo === 'Todos' || s.ciclo === filterCiclo;
-        const matchSerie = !filterSerie || (s.serie || '').toLowerCase().includes(filterSerie.toLowerCase());
+        const matchSerie = !filterSerie || s.serie?.toLowerCase().includes(filterSerie.toLowerCase());
         return matchCiclo && matchSerie;
       })
       .sort((a, b) => {
@@ -181,7 +174,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         >
           <LayoutGrid size={18} /> Painel de Presença
         </button>
-
         <button
           onClick={() => setActiveTab('classification')}
           className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${
@@ -192,7 +184,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         >
           <BarChart3 size={18} /> Classificação
         </button>
-
         <button
           onClick={() => setActiveTab('students')}
           className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${
@@ -317,7 +308,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                         <UserCircle size={32} className="text-slate-300 m-auto mt-3" />
                       )}
                     </div>
-
                     <div>
                       <p className="font-black text-2xl uppercase italic tracking-tighter">{s.name}</p>
                       <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">
@@ -344,8 +334,9 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                     </button>
 
                     <button
-                      onClick={() => updateData({ students: data.students.filter(x => x.id !== s.id) })}
+                      onClick={() => alert('Remoção desativada por segurança (pra não “sumir” e voltar depois).')}
                       className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
+                      title="Remoção desativada por segurança"
                     >
                       <Trash2 size={20} strokeWidth={3} />
                     </button>
@@ -369,27 +360,24 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
           <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950 mb-8">
             Classificação da Turma
           </h2>
-
           <div className="space-y-4">
             {classificationData.map((s, idx) => (
               <div key={s.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
                 <div className="w-10 h-10 bg-indigo-950 text-white rounded-full flex items-center justify-center font-black italic">
                   {idx + 1}º
                 </div>
-
                 <div className="flex-1">
                   <p className="font-black text-indigo-950 uppercase italic">{s.name}</p>
                   <p className="text-[9px] font-black text-indigo-400 uppercase">{s.serie}</p>
                 </div>
-
                 <div className="flex gap-4">
                   <div className="text-center">
                     <p className="text-[8px] font-black text-green-500 uppercase">Presenças</p>
-                    <p className="text-xl font-black text-indigo-950">{s.presencas}</p>
+                    <p className="text-xl font-black text-indigo-950">{(s as any).presencas}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-[8px] font-black text-red-500 uppercase">Faltas</p>
-                    <p className="text-xl font-black text-indigo-950">{s.faltas}</p>
+                    <p className="text-xl font-black text-indigo-950">{(s as any).faltas}</p>
                   </div>
                 </div>
               </div>
@@ -399,18 +387,9 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
       )}
 
       {isAddingStudent && (
-        <div
-          className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4"
-          onClick={() => setIsAddingStudent(false)}
-        >
-          <div
-            className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300"
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setIsAddingStudent(false)}
-              className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all"
-            >
+        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4" onClick={() => setIsAddingStudent(false)}>
+          <div className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setIsAddingStudent(false)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all">
               <X size={24} strokeWidth={4} />
             </button>
 
@@ -473,18 +452,9 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
       )}
 
       {editingStudentId && (
-        <div
-          className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4"
-          onClick={() => setEditingStudentId(null)}
-        >
-          <div
-            className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300"
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setEditingStudentId(null)}
-              className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all"
-            >
+        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4" onClick={() => setEditingStudentId(null)}>
+          <div className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setEditingStudentId(null)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all">
               <X size={24} strokeWidth={4} />
             </button>
 
