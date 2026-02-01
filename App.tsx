@@ -23,7 +23,7 @@ const App: React.FC = () => {
       const cloudData = await syncWithCloud();
       if (cloudData) setData(cloudData);
     } catch (error) {
-      console.error("Erro na sincronização:", error);
+      console.error('Erro na sincronização:', error);
     } finally {
       if (showLoader) setIsSyncing(false);
     }
@@ -54,6 +54,7 @@ const App: React.FC = () => {
 
   const currentUser = useMemo(() => {
     if (!user) return null;
+
     if (user.id === 'admin') return { ...user, role: UserRole.ADMIN };
 
     const p = data.professors.find(p => p.login === user.login);
@@ -65,19 +66,20 @@ const App: React.FC = () => {
     return user;
   }, [user, data]);
 
-  const getAvatarUrl = (u: User) => u.avatarUrl || `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.login}`;
-
   const handleUpdateProfile = async (updates: Partial<User>) => {
     if (!currentUser) return;
 
-    // Atualiza no "user" local para refletir na hora
-    setUser(prev => (prev ? { ...prev, ...updates } : prev));
+    // Admin: só muda visual local (não tem tabela)
+    if (currentUser.role === UserRole.ADMIN) {
+      setUser(prev => (prev ? { ...prev, ...updates } : prev));
+      return;
+    }
 
-    // Atualiza nos dados salvos (professors/students)
     if (currentUser.role === UserRole.PROFESSOR) {
       const nextProfessors = data.professors.map(p =>
         p.login === currentUser.login ? { ...p, ...updates } : p
       );
+      setUser(prev => (prev ? { ...prev, ...updates } : prev));
       await updateData({ professors: nextProfessors });
       return;
     }
@@ -86,17 +88,19 @@ const App: React.FC = () => {
       const nextStudents = data.students.map(s =>
         s.login === currentUser.login ? { ...s, ...updates } : s
       );
+      setUser(prev => (prev ? { ...prev, ...updates } : prev));
       await updateData({ students: nextStudents });
       return;
     }
-
-    // ADMIN: se você quiser avatar do admin depois, dá pra incluir aqui também.
   };
+
+  const getAvatarUrl = (u: User) =>
+    u.avatarUrl || `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed || u.login}`;
 
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
       {!currentUser ? (
-        <Login onLogin={setUser} appData={data} onSync={setData} />
+        <Login onLogin={setUser} appData={data} />
       ) : (
         <>
           <header className="p-4 sticky top-0 z-50">
