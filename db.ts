@@ -6,7 +6,7 @@ const emptyStickers: Sticker[] = Array.from({ length: 45 }, (_, i) => ({
   week: i + 1,
   name: i + 1 >= 42 ? `Elo Supremo - Parte ${i - 40}` : `Semana ${i + 1}`,
   imageUrl: '',
-  rarity: 'NORMAL' // Isso é apenas um padrão inicial, o banco vai atualizar isso!
+  rarity: 'NORMAL'
 }));
 
 export const saveToSupabase = async (table: string, data: any) => {
@@ -30,27 +30,23 @@ export const loadFromSupabase = async (table: string) => {
   }
 };
 
-// Mantendo compatibilidade com o resto do seu app
 export const loadData = async (): Promise<AppData> => {
   const professors = await loadFromSupabase('professors');
   const students = await loadFromSupabase('students');
   const stickers = await loadFromSupabase('stickers');
+  const studentStickers = await loadFromSupabase('student_stickers');
 
   return {
-    professors,
-    students,
+    professors: professors || [],
+    students: students || [],
     stickers: stickers.length > 0 ? stickers : emptyStickers,
-    studentStickers: await loadFromSupabase('student_stickers'),
+    studentStickers: studentStickers || [],
     currentWeek: 1
   };
 };
 
 export const saveData = async (data: AppData) => {
-  await saveToSupabase('professors', data.professors);
-  await saveToSupabase('students', data.students);
-};
-    return finalData;
-  } catch (error) {
-    return null;
-  }
+  // Salva professores e alunos de uma vez no banco
+  if (data.professors.length > 0) await saveToSupabase('professors', data.professors);
+  if (data.students.length > 0) await saveToSupabase('students', data.students);
 };
