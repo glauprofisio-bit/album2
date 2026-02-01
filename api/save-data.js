@@ -9,19 +9,22 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { professors, students, studentStickers, stickers, currentWeek } = req.body;
+    const { professors, students, stickers } = req.body;
 
-    // 1. Sincronizar Professores (Upsert + Delete)
+    // 1. SINCRONIZAÇÃO DE PROFESSORES (DINÂMICA TOTAL)
     if (professors) {
       const validProfs = professors.filter(p => p.id !== 'admin');
       const profLogins = validProfs.map(p => p.login);
       
+      // DELETAR do banco quem NÃO está na lista enviada pelo Admin
+      // Removida qualquer referência fixa a 'Tati'. O Admin manda na lista.
       if (profLogins.length > 0) {
-        await supabase.from('professors').delete().not('login', 'in', `(${profLogins.map(l => `"${l}"`).join(',')})`).neq('login', 'Tati');
+        await supabase.from('professors').delete().not('login', 'in', `(${profLogins.map(l => `"${l}"`).join(',')})`);
       } else {
-        await supabase.from('professors').delete().neq('login', 'Tati');
+        await supabase.from('professors').delete();
       }
 
+      // UPSERT dos professores atuais
       for (const prof of validProfs) {
         await supabase.from('professors').upsert({
           name: prof.name,
@@ -35,7 +38,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 2. Sincronizar Alunos (Upsert + Delete)
+    // 2. SINCRONIZAÇÃO DE ALUNOS
     if (students) {
       const studentLogins = students.map(s => s.login);
       if (studentLogins.length > 0) {
@@ -47,7 +50,7 @@ export default async function handler(req, res) {
       const { data: dbProfs } = await supabase.from('professors').select('id, login');
 
       for (const student of students) {
-        const prof = dbProfs?.find(p => p.login === student.professorLogin) || dbProfs?.find(p => p.id === student.professorId) || dbProfs?.[0];
+        const prof = dbProfs?.find(p => p.login === student.professorLogin) || dbProfs?.find(p => p.id === student.professorId);
         
         await supabase.from('students').upsert({
           name: student.name,
@@ -63,46 +66,21 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3. Sincronizar Figurinhas (Stickers) - INCLUINDO RARIDADE
+    // 3. SINCRONIZAÇÃO DE FIGURINHAS
     if (stickers) {
       for (const s of stickers) {
         await supabase.from('stickers').upsert({
           week: s.week,
           name: s.name,
           image_url: s.imageUrl,
-          rarity: s.rarity // Campo de raridade adicionado
+          rarity: s.rarity
         }, { onConflict: 'week' });
-      }
-    }
-
-    // 4. Sincronizar Figurinhas dos Alunos (student_stickers)
-    if (studentStickers) {
-      const { data: dbStudents } = await supabase.from('students').select('id, login');
-      const { data: dbStickers } = await supabase.from('stickers').select('id, week');
-
-      const studentIds = dbStudents?.map(s => s.id) || [];
-      if (studentIds.length > 0) {
-        await supabase.from('student_stickers').delete().in('student_id', studentIds);
-      }
-
-      for (const ss of studentStickers) {
-        const studentObj = students?.find(s => s.id === ss.alunoId);
-        const dbStudent = dbStudents?.find(dbs => dbs.login === studentObj?.login);
-        const dbSticker = dbStickers?.find(dbs => dbs.week === ss.week);
-
-        if (dbStudent && dbSticker && ss.liberada) {
-          await supabase.from('student_stickers').insert({
-            student_id: dbStudent.id,
-            sticker_id: dbSticker.id,
-            collected_at: ss.date || new Date().toISOString()
-          });
-        }
       }
     }
 
     return res.status(200).json({ success: true });
   } catch (error) {
-    console.error('Erro no handler save-data:', error);
+    console.error('Erro crítico no save-data:', error);
     return res.status(500).json({ error: 'Internal server error', details: String(error) });
   }
 }

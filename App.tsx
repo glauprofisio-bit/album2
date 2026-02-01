@@ -13,17 +13,20 @@ const App: React.FC = () => {
   const [data, setData] = useState<AppData>(loadData());
   const [currentView, setCurrentView] = useState<'dashboard' | 'ranking'>('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isPerformingAction, setIsPerformingAction] = useState(false);
 
   // CADEIA 1: Usuário Abre o App
-  // PASSO 2 e 3: Tenta conectar ao Supabase e substitui dados locais se necessário
   const performSync = useCallback(async (showLoader = false) => {
+    // Se o usuário estiver fazendo uma ação (excluir/salvar), NÃO puxamos dados da nuvem
+    // para evitar que o dado antigo sobrescreva a ação que ainda está sendo processada.
+    if (isPerformingAction) return;
+
     if (showLoader) setIsSyncing(true);
     try {
       const cloudData = await syncWithCloud();
       if (cloudData) {
         setData(cloudData);
         
-        // CADEIA 4 e 6: Se o usuário logado foi excluído ou editado na nuvem
         if (user && user.id !== 'admin') {
           const stillExists = cloudData.professors.find(p => p.login === user.login) || 
                             cloudData.students.find(s => s.login === user.login);
@@ -37,14 +40,12 @@ const App: React.FC = () => {
     } finally {
       if (showLoader) setIsSyncing(false);
     }
-  }, [user]);
+  }, [user, isPerformingAction]);
 
-  // PASSO 2 da Cadeia 1: Executa ao abrir
   useEffect(() => {
     performSync(true);
   }, []);
 
-  // CADEIA 1 - PASSO 4: Sincronização periódica (30 segundos)
   useEffect(() => {
     const interval = setInterval(() => {
       performSync(false);
@@ -52,27 +53,33 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [performSync]);
 
-  // CADEIA 11: Usuário Muda de Tela
-  // PASSO 2: Força sincronização imediata
   useEffect(() => {
     if (user) performSync(false);
   }, [currentView, performSync]);
 
   // CADEIA 2-10: Quando os dados mudam localmente
-  // PASSO 2 e 3: Salva no LocalStorage e envia para o Supabase (via db.ts)
-  const updateData = (newData: Partial<AppData>) => { 
+  // Agora é ASYNC para garantir que a nuvem confirme antes de liberar a UI
+  const updateData = async (newData: Partial<AppData>) => { 
+    setIsPerformingAction(true);
     const updatedData = { ...data, ...newData };
     setData(updatedData);
-    saveData(updatedData); // Isso já dispara o fetch para a nuvem no db.ts
+    
+    // Espera a nuvem confirmar a exclusão/alteração
+    await saveData(updatedData);
+    
+    // Pequeno delay para garantir que o Supabase processou a exclusão física
+    setTimeout(() => {
+      setIsPerformingAction(false);
+    }, 1000);
   };
 
-  const updateUserProfile = (userId: string, profileUpdates: Partial<User>) => {
+  const updateUserProfile = async (userId: string, profileUpdates: Partial<User>) => {
     if (currentUser?.role === UserRole.ALUNO) {
       const newStudents = data.students.map(s => s.id === userId ? { ...s, ...profileUpdates } : s);
-      updateData({ students: newStudents });
+      await updateData({ students: newStudents });
     } else if (currentUser?.role === UserRole.PROFESSOR) {
       const newProfs = data.professors.map(p => p.id === userId ? { ...p, ...profileUpdates } : p);
-      updateData({ professors: newProfs });
+      await updateData({ professors: newProfs });
     }
   };
 
@@ -80,7 +87,6 @@ const App: React.FC = () => {
     if (!user) return null;
     if (user.id === 'admin') return user;
     
-    // Busca o usuário mais atualizado nos dados sincronizados
     const prof = data.professors.find(p => p.login === user.login);
     if (prof) return { ...prof, role: UserRole.PROFESSOR };
     
@@ -103,7 +109,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
-      {isSyncing && !user ? (
+      {(isSyncing || isPerformingAction) && !user ? (
         <div className="min-h-screen bg-indigo-700 flex flex-col items-center justify-center">
           <div className="bg-white p-12 rounded-[3rem] border-[10px] border-indigo-950 shadow-[0_15px_0_0_rgba(30,27,75,1)] flex flex-col items-center gap-6">
             <Loader2 size={64} className="animate-spin text-indigo-600" />
@@ -126,7 +132,7 @@ const App: React.FC = () => {
                <div className="flex items-center gap-3 ml-2">
                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl border-4 border-indigo-950 bg-slate-100 overflow-hidden flex-shrink-0 relative">
                     {getAvatarUrl(currentUser) ? <img src={getAvatarUrl(currentUser)!} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-indigo-200"><UserCircle size={24} /></div>}
-                    {isSyncing && <div className="absolute inset-0 bg-white/50 flex items-center justify-center"><RefreshCw size={16} className="animate-spin text-indigo-600" /></div>}
+                    {(isSyncing || isPerformingAction) && <div className="absolute inset-0 bg-white/50 flex items-center justify-center"><RefreshCw size={16} className="animate-spin text-indigo-600" /></div>}
                  </div>
                  <div className="hidden sm:flex flex-col">
                    <h1 className="font-black text-sm md:text-base leading-none tracking-tighter uppercase italic text-indigo-950">{currentUser.name}</h1>

@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { AppData, User, UserRole, Sticker, StickerRarity } from '../types';
-import { Users, LayoutGrid, Plus, Trash2, X, Image as ImageIcon, Calendar, Upload, Star, Gem, Loader2, Edit2 } from 'lucide-react';
+import { Users, LayoutGrid, Plus, Trash2, X, Image as ImageIcon, Calendar, Upload, Star, Gem, Loader2, Edit2, CloudCheck, CloudOff } from 'lucide-react';
 
 interface AdminDashboardProps {
   data: AppData;
-  updateData: (newData: Partial<AppData>) => void;
+  updateData: (newData: Partial<AppData>) => Promise<void>; // Agora é async
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => {
@@ -13,31 +13,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
   const [profForm, setProfForm] = useState({ name: '', email: '', login: '', password: '' });
   const [editingProfId, setEditingProfId] = useState<string | null>(null);
   const [editingProfForm, setEditingProfForm] = useState({ name: '', email: '', login: '', password: '' });
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const handleAddProfessor = (e: React.FormEvent) => {
+  const handleAddProfessor = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSyncing(true);
     const newProf: User = {
       id: Math.random().toString(36).substr(2, 9),
       ...profForm,
       role: UserRole.PROFESSOR
     };
-    updateData({ professors: [...data.professors, newProf] });
+    await updateData({ professors: [...data.professors, newProf] });
     setProfForm({ name: '', email: '', login: '', password: '' });
     setIsAddingProf(false);
+    setIsSyncing(false);
   };
 
-  const handleEditProfessor = (e: React.FormEvent) => {
+  const handleEditProfessor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingProfId) {
+      setIsSyncing(true);
       const updatedProfs = data.professors.map(p => 
         p.id === editingProfId ? { ...p, ...editingProfForm } : p
       );
-      updateData({ professors: updatedProfs });
+      await updateData({ professors: updatedProfs });
       setEditingProfId(null);
+      setIsSyncing(false);
     }
   };
 
-  const handleUpdateSticker = (week: number, imageUrl: string, name: string, rarity: StickerRarity) => {
+  const handleUpdateSticker = async (week: number, imageUrl: string, name: string, rarity: StickerRarity) => {
+    setIsSyncing(true);
     const newStickers = [...data.stickers];
     const index = newStickers.findIndex(s => s.week === week);
     if (index !== -1) {
@@ -45,11 +51,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
     } else {
       newStickers.push({ id: `sticker-${week}`, week, imageUrl, name, rarity });
     }
-    updateData({ stickers: newStickers });
+    await updateData({ stickers: newStickers });
+    setIsSyncing(false);
+  };
+
+  const handleDeleteProfessor = async (p: User) => {
+    if (confirm(`Deseja realmente excluir o professor ${p.name}? Esta ação é definitiva na nuvem.`)) {
+      setIsSyncing(true);
+      const newProfs = data.professors.filter(x => x.id !== p.id);
+      await updateData({ professors: newProfs });
+      setIsSyncing(false);
+    }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Indicador de Sincronização Crítica */}
+      <div className="fixed bottom-6 right-6 z-[5000]">
+        {isSyncing ? (
+          <div className="bg-indigo-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-4 border-white animate-bounce">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="font-black uppercase text-[10px] tracking-widest">Salvando na Nuvem...</span>
+          </div>
+        ) : (
+          <div className="bg-green-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-4 border-white opacity-50">
+            <CloudCheck size={20} />
+            <span className="font-black uppercase text-[10px] tracking-widest">Sincronizado</span>
+          </div>
+        )}
+      </div>
+
       <div className="flex bg-indigo-950 p-2 rounded-[2rem] gap-2 border-4 border-white/20 shadow-xl">
         <button onClick={() => setActiveTab('professors')} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-[1.5rem] transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'professors' ? 'bg-indigo-600 text-white shadow-lg' : 'text-indigo-300 hover:bg-white/5'}`}><Users size={18} /><span>Professores</span></button>
         <button onClick={() => setActiveTab('stickers')} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-[1.5rem] transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'stickers' ? 'bg-indigo-600 text-white shadow-lg' : 'text-indigo-300 hover:bg-white/5'}`}><LayoutGrid size={18} /><span>Figurinhas</span></button>
@@ -60,7 +91,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
            <button 
              onClick={() => setIsAddingProf(true)} 
-             className="w-full py-8 bg-green-500 hover:bg-green-600 text-white rounded-[2.5rem] font-black text-2xl shadow-xl flex items-center justify-center gap-4 uppercase italic transition-all active:scale-95 border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)]"
+             disabled={isSyncing}
+             className="w-full py-8 bg-green-500 hover:bg-green-600 text-white rounded-[2.5rem] font-black text-2xl shadow-xl flex items-center justify-center gap-4 uppercase italic transition-all active:scale-95 border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] disabled:opacity-50"
            >
              <Plus size={32} strokeWidth={4} /> Novo Professor
            </button>
@@ -75,21 +107,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
                     </div>
                     <div className="flex flex-col gap-2">
                       <button 
+                        disabled={isSyncing}
                         onClick={() => { 
                           setEditingProfId(p.id); 
                           setEditingProfForm({ name: p.name, email: p.email || '', login: p.login, password: p.password }); 
                         }} 
-                        className="bg-blue-100 p-3 rounded-2xl text-blue-600 hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-200"
+                        className="bg-blue-100 p-3 rounded-2xl text-blue-600 hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-200 disabled:opacity-50"
                       >
                         <Edit2 size={20} strokeWidth={3} />
                       </button>
                       <button 
-                        onClick={() => {
-                          if (confirm(`Deseja realmente excluir o professor ${p.name}?`)) {
-                            updateData({ professors: data.professors.filter(x => x.id !== p.id) });
-                          }
-                        }} 
-                        className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
+                        disabled={isSyncing}
+                        onClick={() => handleDeleteProfessor(p)} 
+                        className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200 disabled:opacity-50"
                       >
                         <Trash2 size={20} strokeWidth={3} />
                       </button>
@@ -115,15 +145,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
            <h2 className="text-4xl font-black italic uppercase text-indigo-950 tracking-tighter">Calendário Letivo</h2>
            <div className="flex items-center justify-center gap-10">
               <button 
+                disabled={isSyncing}
                 onClick={() => updateData({ currentWeek: Math.max(1, data.currentWeek - 1) })} 
-                className="w-20 h-20 bg-indigo-100 hover:bg-indigo-600 hover:text-white rounded-[2rem] text-4xl font-black border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all text-indigo-950"
+                className="w-20 h-20 bg-indigo-100 hover:bg-indigo-600 hover:text-white rounded-[2rem] text-4xl font-black border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all text-indigo-950 disabled:opacity-50"
               >-</button>
               <div className="text-8xl font-black bg-white text-indigo-950 p-8 rounded-[3rem] border-[10px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] min-w-[180px]">
                 {data.currentWeek}
               </div>
               <button 
+                disabled={isSyncing}
                 onClick={() => updateData({ currentWeek: Math.min(45, data.currentWeek + 1) })} 
-                className="w-20 h-20 bg-indigo-100 hover:bg-indigo-600 hover:text-white rounded-[2rem] text-4xl font-black border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all text-indigo-950"
+                className="w-20 h-20 bg-indigo-100 hover:bg-indigo-600 hover:text-white rounded-[2rem] text-4xl font-black border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all text-indigo-950 disabled:opacity-50"
               >+</button>
            </div>
         </div>
@@ -140,7 +172,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
                   <input required placeholder="Login" value={editingProfForm.login} onChange={e => setEditingProfForm({...editingProfForm, login: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
                   <input required placeholder="Senha" value={editingProfForm.password} onChange={e => setEditingProfForm({...editingProfForm, password: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
                 </div>
-                <button type="submit" className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95">Salvar Alterações</button>
+                <button type="submit" disabled={isSyncing} className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95 disabled:opacity-50">Salvar Alterações</button>
               </form>
            </div>
         </div>
@@ -157,7 +189,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
                   <input required placeholder="Login" value={profForm.login} onChange={e => setProfForm({...profForm, login: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
                   <input required placeholder="Senha" value={profForm.password} onChange={e => setProfForm({...profForm, password: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
                 </div>
-                <button type="submit" className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95">Salvar Acesso</button>
+                <button type="submit" disabled={isSyncing} className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95 disabled:opacity-50">Salvar Acesso</button>
               </form>
            </div>
         </div>
@@ -166,12 +198,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
   );
 };
 
-const StickerEditor: React.FC<{ week: number, sticker?: Sticker, onSave: (w: number, u: string, n: string, r: StickerRarity) => void }> = ({ week, sticker, onSave }) => {
+const StickerEditor: React.FC<{ week: number, sticker?: Sticker, onSave: (w: number, u: string, n: string, r: StickerRarity) => Promise<void> }> = ({ week, sticker, onSave }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [url, setUrl] = useState(sticker?.imageUrl || '');
   const [name, setName] = useState(sticker?.name || `Semana ${week}`);
   const [rarity, setRarity] = useState<StickerRarity>(sticker?.rarity || StickerRarity.NORMAL);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getRarityInfo = (r: StickerRarity) => {
@@ -259,7 +292,18 @@ const StickerEditor: React.FC<{ week: number, sticker?: Sticker, onSave: (w: num
 
               <div className="flex gap-4 pt-4">
                 <button onClick={() => setIsEditing(false)} className="flex-1 py-5 bg-slate-100 text-slate-500 font-black rounded-2xl uppercase text-[11px] tracking-widest border-2 border-slate-200">Voltar</button>
-                <button onClick={() => { onSave(week, url, name, rarity); setIsEditing(false); }} className="flex-[2] py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl uppercase text-[11px] tracking-widest border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)]">Salvar Alterações</button>
+                <button 
+                  disabled={isSaving}
+                  onClick={async () => { 
+                    setIsSaving(true);
+                    await onSave(week, url, name, rarity); 
+                    setIsSaving(false);
+                    setIsEditing(false); 
+                  }} 
+                  className="flex-[2] py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl uppercase text-[11px] tracking-widest border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] disabled:opacity-50"
+                >
+                  {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
               </div>
             </div>
           </div>

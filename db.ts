@@ -6,7 +6,8 @@ const emptyStickers: Sticker[] = Array.from({ length: 45 }, (_, i) => ({
   id: `sticker-${i + 1}`,
   week: i + 1,
   name: i + 1 >= 42 ? `Elo Supremo - Parte ${i - 40}` : `Semana ${i + 1}`,
-  imageUrl: '' 
+  imageUrl: '',
+  rarity: 'NORMAL'
 }));
 
 export const initialData: AppData = {
@@ -30,25 +31,33 @@ export const loadData = (): AppData => {
   return initialData;
 };
 
-export const saveData = (data: AppData) => {
+// Função para salvar localmente e IMEDIATAMENTE na nuvem
+export const saveData = async (data: AppData) => {
   if (typeof window === 'undefined') return;
+  
+  // 1. Salva no LocalStorage primeiro (velocidade)
   localStorage.setItem(DB_KEY, JSON.stringify(data));
   
-  // PASSO 3 da Cadeia 2-10: Enviar dados locais para a nuvem (Assíncrono)
-  fetch('/api/save-data', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).catch(err => console.error("Erro ao salvar na nuvem:", err));
+  // 2. Envia para a nuvem IMEDIATAMENTE e espera a confirmação
+  // Isso evita que o loop de 30s puxe dados antigos antes da exclusão ser processada
+  try {
+    const response = await fetch('/api/save-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Falha ao salvar na nuvem');
+    console.log("Dados sincronizados com sucesso após alteração.");
+  } catch (err) {
+    console.error("Erro crítico ao salvar na nuvem:", err);
+  }
 };
 
 export const syncWithCloud = async (): Promise<AppData | null> => {
   try {
-    // PASSO 2 da Cadeia 1: Puxar dados mais recentes da nuvem
     const response = await fetch('/api/load-data');
     if (response.ok) {
       const cloudData = await response.json();
-      // PASSO 3 da Cadeia 1: Se dados da nuvem existirem, eles são a verdade absoluta
       if (cloudData && typeof cloudData === 'object') {
         if (typeof window !== 'undefined') {
           localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
@@ -57,7 +66,7 @@ export const syncWithCloud = async (): Promise<AppData | null> => {
       }
     }
   } catch (error) {
-    console.error("Erro na sincronização com a nuvem:", error);
+    console.error("Erro na sincronização de fundo:", error);
   }
   return null;
 };
