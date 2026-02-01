@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { AppData, User, UserRole, Sticker, StickerRarity } from '../types';
-import { Users, LayoutGrid, Plus, Trash2, X, Image as ImageIcon, Calendar, Upload, Star, Gem, Loader2 } from 'lucide-react';
+import { Users, LayoutGrid, Plus, Trash2, X, Image as ImageIcon, Calendar, Upload, Star, Gem, Loader2, Edit2 } from 'lucide-react';
 
 interface AdminDashboardProps {
   data: AppData;
@@ -12,6 +12,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
   const [activeTab, setActiveTab] = useState<'professors' | 'stickers' | 'config'>('professors');
   const [isAddingProf, setIsAddingProf] = useState(false);
   const [profForm, setProfForm] = useState({ name: '', email: '', login: '', password: '' });
+  const [editingProfId, setEditingProfId] = useState<string | null>(null);
+  const [editingProfForm, setEditingProfForm] = useState({ name: '', email: '', login: '', password: '' });
 
   const handleAddProfessor = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +25,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
     updateData({ professors: [...data.professors, newProf] });
     setProfForm({ name: '', email: '', login: '', password: '' });
     setIsAddingProf(false);
+  };
+
+  const handleEditProfessor = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingProfId) {
+      const updatedProfs = data.professors.map(p => 
+        p.id === editingProfId ? { ...p, ...editingProfForm } : p
+      );
+      updateData({ professors: updatedProfs });
+      setEditingProfId(null);
+    }
   };
 
   const handleUpdateSticker = (week: number, imageUrl: string, name: string, rarity: StickerRarity) => {
@@ -54,12 +67,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
            </button>
            <div className="grid gap-6 md:grid-cols-2">
               {data.professors.map(p => (
-                <div key={p.id} className="bg-white text-indigo-950 p-8 rounded-[3rem] border-[8px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] flex justify-between items-center group transition-all hover:-translate-y-1">
-                  <div>
-                    <p className="font-black text-2xl uppercase italic tracking-tighter">{p.name}</p>
-                    <p className="text-[10px] font-black text-indigo-400 mt-2 bg-indigo-50 inline-block px-3 py-1 rounded-full border border-indigo-100 uppercase tracking-widest">Login: {p.login}</p>
+                <div key={p.id} className="bg-white text-indigo-950 p-8 rounded-[3rem] border-[8px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] flex flex-col gap-4 group transition-all hover:-translate-y-1">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1">
+                      <p className="font-black text-2xl uppercase italic tracking-tighter">{p.name}</p>
+                      <p className="text-[10px] font-black text-indigo-600 mt-3 bg-indigo-50 inline-block px-3 py-2 rounded-full border-2 border-indigo-200 uppercase tracking-widest">Login: <span className="font-bold">{p.login}</span></p>
+                      <p className="text-[10px] font-black text-indigo-600 mt-2 bg-indigo-50 inline-block px-3 py-2 rounded-full border-2 border-indigo-200 uppercase tracking-widest">Senha: <span className="font-bold">{p.password}</span></p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={() => { 
+                          setEditingProfId(p.id); 
+                          setEditingProfForm({ name: p.name, email: p.email || '', login: p.login, password: p.password }); 
+                        }} 
+                        className="bg-blue-100 p-3 rounded-2xl text-blue-600 hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-200"
+                      >
+                        <Edit2 size={20} strokeWidth={3} />
+                      </button>
+                      <button 
+                        onClick={() => updateData({ professors: data.professors.filter(x => x.id !== p.id) })} 
+                        className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
+                      >
+                        <Trash2 size={20} strokeWidth={3} />
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={() => updateData({ professors: data.professors.filter(x => x.id !== p.id) })} className="bg-red-100 p-4 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"><Trash2 size={24} strokeWidth={3} /></button>
                 </div>
               ))}
               {data.professors.length === 0 && <p className="col-span-full text-center text-indigo-300 py-20 font-black uppercase tracking-widest opacity-40">Nenhum professor registrado</p>}
@@ -91,6 +123,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
                 onClick={() => updateData({ currentWeek: Math.min(45, data.currentWeek + 1) })} 
                 className="w-20 h-20 bg-indigo-100 hover:bg-indigo-600 hover:text-white rounded-[2rem] text-4xl font-black border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all text-indigo-950"
               >+</button>
+           </div>
+        </div>
+      )}
+
+      {editingProfId && (
+        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4" onClick={() => setEditingProfId(null)}>
+           <div className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setEditingProfId(null)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all"><X size={24} strokeWidth={4}/></button>
+              <h3 className="text-4xl font-black mb-10 text-center italic uppercase tracking-tighter">Editar Professor</h3>
+              <form onSubmit={handleEditProfessor} className="space-y-6">
+                <input required placeholder="Nome do Professor" value={editingProfForm.name} onChange={e => setEditingProfForm({...editingProfForm, name: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg" />
+                <div className="grid grid-cols-2 gap-6">
+                  <input required placeholder="Login" value={editingProfForm.login} onChange={e => setEditingProfForm({...editingProfForm, login: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
+                  <input required placeholder="Senha" value={editingProfForm.password} onChange={e => setEditingProfForm({...editingProfForm, password: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
+                </div>
+                <button type="submit" className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95">Salvar Alterações</button>
+              </form>
            </div>
         </div>
       )}

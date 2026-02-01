@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo } from 'react';
 import { AppData, User, UserRole, AlunoSticker } from '../types';
-import { CheckCircle, Plus, X, User as UserIcon, Trash2, LayoutGrid, Users as UsersIcon, UserCircle, Star, Sparkles, XCircle, BarChart3, ArrowUpDown, Filter } from 'lucide-react';
+import { CheckCircle, Plus, X, User as UserIcon, Trash2, LayoutGrid, Users as UsersIcon, UserCircle, Star, Sparkles, XCircle, BarChart3, ArrowUpDown, Filter, Edit2 } from 'lucide-react';
 import AvatarPickerModal from './AvatarPickerModal';
 import confetti from 'canvas-confetti';
 
@@ -16,6 +15,8 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
   const [activeTab, setActiveTab] = useState<'students' | 'grid' | 'classification'>('grid');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [editingStudentForm, setEditingStudentForm] = useState({ name: '', login: '', password: '', serie: '', ciclo: 'Anos Iniciais' as User['ciclo'] });
   const [studentForm, setStudentForm] = useState({ 
     name: '', 
     login: '', 
@@ -48,6 +49,17 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     updateData({ students: [...data.students, newStudent] });
     setStudentForm({ name: '', login: '', password: '', serie: '', ciclo: 'Anos Iniciais' });
     setIsAddingStudent(false);
+  };
+
+  const handleEditStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingStudentId) {
+      const updatedStudents = data.students.map(s => 
+        s.id === editingStudentId ? { ...s, ...editingStudentForm } : s
+      );
+      updateData({ students: updatedStudents });
+      setEditingStudentId(null);
+    }
   };
 
   const toggleSticker = (alunoId: string, week: number) => {
@@ -198,57 +210,42 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
       {activeTab === 'classification' && (
         <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
-           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10 border-b-4 border-indigo-50 pb-8">
-              <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">Classificação Geral</h2>
-              
-              <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-                 <div className="flex items-center gap-2 bg-indigo-50 px-4 py-2 rounded-2xl border-2 border-indigo-100">
-                    <Filter size={16} className="text-indigo-400" />
-                    <select value={filterCiclo} onChange={e => setFilterCiclo(e.target.value)} className="bg-transparent font-black text-[10px] uppercase outline-none text-indigo-950 appearance-none pr-6 relative">
-                       <option value="Todos">Todos os Ciclos</option>
-                       <option value="Anos Iniciais">Anos Iniciais</option>
-                       <option value="Anos Finais">Anos Finais</option>
-                       <option value="Ensino Médio">Ensino Médio</option>
-                    </select>
-                 </div>
-                 <input 
-                   placeholder="Filtrar Série (ex: 1A)" 
-                   value={filterSerie}
-                   onChange={e => setFilterSerie(e.target.value.toUpperCase())}
-                   className="bg-indigo-50 px-4 py-2 rounded-2xl border-2 border-indigo-100 font-black text-[10px] uppercase outline-none text-indigo-950 w-32 placeholder:text-indigo-200"
-                 />
-                 <button 
-                   onClick={() => setSortOrder(sortOrder === 'presenca' ? 'falta' : 'presenca')}
-                   className="bg-indigo-950 text-white px-6 py-2 rounded-2xl border-2 border-indigo-950 font-black text-[10px] uppercase flex items-center gap-2 active:scale-95 transition-all shadow-md"
-                 >
-                   <ArrowUpDown size={14} /> {sortOrder === 'presenca' ? 'Ver Mais Faltantes' : 'Ver Mais Presentes'}
+           <div className="flex flex-col md:flex-row gap-6 mb-8 items-center flex-wrap">
+              <div className="flex items-center gap-3">
+                 <Filter size={20} className="text-indigo-600" />
+                 <select value={filterCiclo} onChange={e => setFilterCiclo(e.target.value)} className="px-6 py-3 bg-indigo-50 rounded-2xl border-2 border-indigo-200 font-black text-[11px] uppercase tracking-widest outline-none">
+                   <option>Todos</option>
+                   <option>Anos Iniciais</option>
+                   <option>Anos Finais</option>
+                   <option>Ensino Médio</option>
+                 </select>
+              </div>
+              <input placeholder="Filtrar por série..." value={filterSerie} onChange={e => setFilterSerie(e.target.value)} className="px-6 py-3 bg-indigo-50 rounded-2xl border-2 border-indigo-200 font-black text-[11px] uppercase tracking-widest outline-none" />
+              <div className="flex items-center gap-3 ml-auto">
+                 <button onClick={() => setSortOrder(sortOrder === 'presenca' ? 'falta' : 'presenca')} className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest border-2 transition-all ${sortOrder === 'presenca' ? 'bg-green-500 text-white border-green-600' : 'bg-red-500 text-white border-red-600'}`}>
+                   {sortOrder === 'presenca' ? '✓ Presença' : '✗ Faltas'}
                  </button>
-                 <button 
-                   onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                   className="bg-white text-indigo-950 px-6 py-2 rounded-2xl border-2 border-indigo-950 font-black text-[10px] uppercase active:scale-95 transition-all"
-                 >
-                   {sortDirection === 'desc' ? 'MAIOR → MENOR' : 'MENOR → MAIOR'}
+                 <button onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')} className="px-4 py-3 bg-indigo-100 rounded-2xl border-2 border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all">
+                   <ArrowUpDown size={18} />
                  </button>
               </div>
            </div>
 
-           <div className="space-y-4">
-              {classificationData.length === 0 ? (
-                <div className="py-20 text-center text-indigo-200 font-black uppercase tracking-widest italic">Nenhum aluno encontrado com esses filtros</div>
-              ) : (
-                classificationData.map((s, idx) => (
-                  <div key={s.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-[2.5rem] border-4 border-indigo-950/10 hover:border-indigo-600 transition-all group">
-                     <div className="flex items-center gap-6">
-                        <span className="text-2xl font-black text-indigo-200 w-10 text-center group-hover:text-indigo-600 transition-colors">#{idx + 1}</span>
-                        <div className="w-16 h-16 rounded-2xl border-4 border-indigo-950 overflow-hidden bg-white shadow-md">
-                           {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" /> : <UserCircle className="text-slate-200" />}
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {classificationData.map((s, idx) => (
+                  <div key={s.id} className="bg-gradient-to-br from-indigo-50 to-white p-8 rounded-[2.5rem] border-4 border-indigo-950 shadow-lg relative overflow-hidden">
+                    <div className="absolute -top-4 -right-4 w-20 h-20 bg-indigo-200 rounded-full opacity-20" />
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="w-16 h-16 bg-white rounded-2xl border-4 border-indigo-950 overflow-hidden flex-shrink-0">
+                           {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" /> : <UserIcon className="w-full h-full text-indigo-200" />}
                         </div>
                         <div>
-                           <p className="font-black text-indigo-950 uppercase italic text-xl tracking-tighter leading-none mb-1">{s.name}</p>
-                           <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest italic">{s.serie} • {s.ciclo}</p>
+                          <p className="font-black text-xl uppercase italic tracking-tighter text-indigo-950 leading-none">{s.name}</p>
+                          <p className="text-[9px] font-black text-indigo-400 mt-1 uppercase tracking-widest">{s.serie} • {s.ciclo}</p>
                         </div>
-                     </div>
-                     <div className="flex gap-10">
+                      </div>
+                      <div className="flex gap-10">
                         <div className="text-center">
                            <p className={`text-4xl font-black leading-none ${sortOrder === 'presenca' ? 'text-green-500' : 'text-slate-200'}`}>{s.presencas}</p>
                            <p className="text-[9px] font-black uppercase text-indigo-300 tracking-widest mt-1">Presente</p>
@@ -280,14 +277,76 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                         <div>
                           <h3 className="font-black text-2xl uppercase italic tracking-tighter leading-none">{student.name}</h3>
                           <div className="flex flex-wrap gap-2 mt-3 justify-center md:justify-start">
-                             <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 italic">Login: {student.login}</span>
-                             <span className="text-[8px] font-black text-white uppercase tracking-widest bg-indigo-950 px-3 py-1 rounded-full italic">{student.serie} | {student.ciclo}</span>
+                             <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-2 rounded-full border-2 border-indigo-200 italic">Login: <span className="font-bold">{student.login}</span></span>
+                             <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-2 rounded-full border-2 border-indigo-200 italic">Senha: <span className="font-bold">{student.password}</span></span>
+                             <span className="text-[8px] font-black text-white uppercase tracking-widest bg-indigo-950 px-3 py-2 rounded-full italic">{student.serie} | {student.ciclo}</span>
                           </div>
                         </div>
                     </div>
-                    <button onClick={() => { if(confirm(`Excluir ${student.name}?`)) updateData({ students: data.students.filter(s => s.id !== student.id) }); }} className="w-full py-4 bg-red-100 text-red-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all border-2 border-red-200">Remover Estudante</button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => { 
+                          setEditingStudentId(student.id); 
+                          setEditingStudentForm({ name: student.name, login: student.login, password: student.password, serie: student.serie || '', ciclo: student.ciclo || 'Anos Iniciais' }); 
+                        }} 
+                        className="flex-1 py-3 bg-blue-100 text-blue-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-200 flex items-center justify-center gap-2"
+                      >
+                        <Edit2 size={16} /> Editar
+                      </button>
+                      <button 
+                        onClick={() => { if(confirm(`Excluir ${student.name}?`)) updateData({ students: data.students.filter(s => s.id !== student.id) }); }} 
+                        className="flex-1 py-3 bg-red-100 text-red-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all border-2 border-red-200"
+                      >
+                        Remover
+                      </button>
+                    </div>
                   </div>
               ))}
+           </div>
+        </div>
+      )}
+
+      {editingStudentId && (
+        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4" onClick={() => setEditingStudentId(null)}>
+           <div className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setEditingStudentId(null)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all z-20"><X size={24} strokeWidth={4} /></button>
+              <h3 className="text-4xl font-black mb-10 text-center italic uppercase tracking-tighter">Editar Aluno</h3>
+              <form onSubmit={handleEditStudent} className="space-y-6">
+                <div className="space-y-2">
+                   <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Nome Completo</label>
+                   <input required placeholder="Ex: João Silva" value={editingStudentForm.name} onChange={e => setEditingStudentForm({...editingStudentForm, name: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 text-lg outline-none focus:bg-white" />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Série</label>
+                    <input required placeholder="Ex: 1A" value={editingStudentForm.serie} onChange={e => setEditingStudentForm({...editingStudentForm, serie: e.target.value.toUpperCase()})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none uppercase focus:bg-white" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Ciclo</label>
+                    <div className="relative">
+                      <select value={editingStudentForm.ciclo} onChange={e => setEditingStudentForm({...editingStudentForm, ciclo: e.target.value as User['ciclo']})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none appearance-none focus:bg-white">
+                         <option value="Anos Iniciais">Anos Iniciais</option>
+                         <option value="Anos Finais">Anos Finais</option>
+                         <option value="Ensino Médio">Ensino Médio</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Usuário</label>
+                    <input required placeholder="Login" value={editingStudentForm.login} onChange={e => setEditingStudentForm({...editingStudentForm, login: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none focus:bg-white" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Senha</label>
+                    <input required placeholder="Senha" value={editingStudentForm.password} onChange={e => setEditingStudentForm({...editingStudentForm, password: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none focus:bg-white" />
+                  </div>
+                </div>
+
+                <button type="submit" className="w-full py-8 bg-indigo-600 text-white font-black rounded-[2.5rem] mt-8 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)]">Salvar Alterações</button>
+              </form>
            </div>
         </div>
       )}
