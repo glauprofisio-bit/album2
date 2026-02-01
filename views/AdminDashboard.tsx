@@ -1,7 +1,6 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { AppData, User, UserRole, Sticker, StickerRarity } from '../types';
-import { Users, LayoutGrid, Plus, Trash2, X, Image as ImageIcon, Calendar, Upload, Star, Gem, Loader2, Edit2 } from 'lucide-react';
+import { Users, LayoutGrid, Plus, Trash2, X, Calendar, Star, Edit2 } from 'lucide-react';
 
 interface AdminDashboardProps {
   data: AppData;
@@ -85,7 +84,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
                         <Edit2 size={20} strokeWidth={3} />
                       </button>
                       <button 
-                        onClick={() => updateData({ professors: data.professors.filter(x => x.id !== p.id) })} 
+                        onClick={() => {
+                          if (confirm(`Deseja realmente excluir o professor ${p.name}?`)) {
+                            updateData({ professors: data.professors.filter(x => x.id !== p.id) });
+                          }
+                        }} 
                         className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
                       >
                         <Trash2 size={20} strokeWidth={3} />
@@ -110,7 +113,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
       {activeTab === 'config' && (
         <div className="animate-in slide-in-from-bottom-4 duration-300 bg-white rounded-[4rem] p-16 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] text-center space-y-10">
            <h2 className="text-4xl font-black italic uppercase text-indigo-950 tracking-tighter">Calendário Letivo</h2>
-           <p className="text-indigo-400 font-black uppercase tracking-widest text-[11px] bg-indigo-50 inline-block px-6 py-2 rounded-full">Defina a semana atual do álbum</p>
            <div className="flex items-center justify-center gap-10">
               <button 
                 onClick={() => updateData({ currentWeek: Math.max(1, data.currentWeek - 1) })} 
@@ -169,101 +171,31 @@ const StickerEditor: React.FC<{ week: number, sticker?: Sticker, onSave: (w: num
   const [url, setUrl] = useState(sticker?.imageUrl || '');
   const [name, setName] = useState(sticker?.name || `Semana ${week}`);
   const [rarity, setRarity] = useState<StickerRarity>(sticker?.rarity || StickerRarity.NORMAL);
-  const [isCompressing, setIsCompressing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const getRarityInfo = (r: StickerRarity) => {
-    switch(r) {
-      case StickerRarity.RUBY: return { color: 'text-red-500', bg: 'bg-red-500', label: 'Rubi' };
-      case StickerRarity.EMERALD: return { color: 'text-emerald-500', bg: 'bg-emerald-500', label: 'Esmeralda' };
-      case StickerRarity.OBSIDIAN: return { color: 'text-slate-950', bg: 'bg-indigo-950', label: 'Obsidiana' };
-      case StickerRarity.GOLD: return { color: 'text-yellow-500', bg: 'bg-amber-500', label: 'Ouro' };
-      case StickerRarity.DIAMOND: return { color: 'text-cyan-500', bg: 'bg-cyan-500', label: 'Diamante' };
-      default: return { color: 'text-indigo-400', bg: 'bg-indigo-600', label: 'Padrão' };
-    }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setIsCompressing(true);
-      const reader = new FileReader();
-      reader.onloadend = () => { setUrl(reader.result as string); setIsCompressing(false); };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const currentInfo = getRarityInfo(rarity);
 
   return (
-    <>
-      <div onClick={() => setIsEditing(true)} className={`bg-white p-4 rounded-[2.5rem] shadow-xl cursor-pointer hover:scale-105 transition-all text-indigo-950 border-[6px] border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none`}>
-        <div className="aspect-square bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center mb-3 border-2 border-slate-100">
-           {url ? <img src={url} className="w-full h-full object-cover" /> : <ImageIcon className="text-slate-200" size={32} />}
-        </div>
-        <p className="text-[10px] font-black text-center truncate uppercase italic tracking-tighter leading-none mb-1">{name}</p>
-        <div className={`h-2 w-full rounded-full ${currentInfo.bg} border-2 border-indigo-950 shadow-inner`} />
-      </div>
-
-      {isEditing && (
-        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[2000] flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsEditing(false)}>
-          <div className="bg-white p-10 rounded-[4rem] w-full max-w-[460px] shadow-2xl relative border-[12px] border-indigo-950 my-auto animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setIsEditing(false)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl"><X size={24} strokeWidth={4}/></button>
-            <h3 className="text-4xl font-black text-indigo-950 mb-8 italic uppercase tracking-tighter">Editar Semana {week}</h3>
-            
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Identificação</label>
-                <input value={name} onChange={e => setName(e.target.value)} className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950" />
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex justify-between items-center ml-4">
-                  <label className="text-[10px] font-black uppercase text-indigo-300 tracking-widest">Raridade</label>
-                  <span className={`text-[10px] font-black px-4 py-2 rounded-full text-white uppercase tracking-widest ${currentInfo.bg} border-2 border-indigo-950`}>{currentInfo.label}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-3 p-4 bg-indigo-50 rounded-[2.5rem] border-4 border-indigo-950">
-                  {[StickerRarity.NORMAL, StickerRarity.RUBY, StickerRarity.EMERALD, StickerRarity.OBSIDIAN, StickerRarity.GOLD, StickerRarity.DIAMOND].map(r => {
-                    const info = getRarityInfo(r);
-                    return (
-                      <button 
-                        key={r} 
-                        onClick={() => setRarity(r)} 
-                        className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all border-4 ${rarity === r ? `bg-white border-indigo-950 shadow-md scale-105` : 'bg-transparent border-transparent opacity-40'}`}
-                      >
-                        <div className={`p-2 rounded-xl ${info.bg} text-white shadow-sm border-2 border-indigo-950`}>
-                           {r === StickerRarity.NORMAL ? <ImageIcon size={18} /> : <Star size={18} />}
-                        </div>
-                        <span className={`text-[8px] font-black uppercase tracking-tighter ${info.color}`}>{info.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <button onClick={() => fileInputRef.current?.click()} className="w-full py-10 border-4 border-dashed border-indigo-200 rounded-[2.5rem] flex flex-col items-center gap-2 text-indigo-400 font-black hover:bg-indigo-50 transition-all hover:border-indigo-400">
-                  {isCompressing ? <Loader2 className="animate-spin" /> : <Upload size={40} />}
-                  <span className="text-[10px] uppercase tracking-[0.3em]">Importar Imagem</span>
-                </button>
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
-              </div>
-
-              {url && (
-                <div className="aspect-video w-full rounded-[2rem] overflow-hidden border-4 border-indigo-950 bg-indigo-50 flex items-center justify-center shadow-inner relative">
-                  <img src={url} className="max-w-full max-h-full object-contain" />
-                </div>
-              )}
-
-              <div className="flex gap-4 pt-4">
-                <button onClick={() => setIsEditing(false)} className="flex-1 py-5 bg-slate-100 text-slate-500 font-black rounded-2xl uppercase text-[11px] tracking-widest border-2 border-slate-200">Voltar</button>
-                <button onClick={() => { onSave(week, url, name, rarity); setIsEditing(false); }} className="flex-[2] py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl uppercase text-[11px] tracking-widest border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)]">Salvar Alterações</button>
-              </div>
+    <div className="bg-white p-4 rounded-[2rem] border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] flex flex-col gap-3">
+       <div className="aspect-square bg-slate-50 rounded-xl border-2 border-indigo-50 overflow-hidden flex items-center justify-center">
+          {url ? <img src={url} className="w-full h-full object-cover" /> : <Star className="text-indigo-100" size={32} />}
+       </div>
+       <p className="text-[10px] font-black text-indigo-950 uppercase text-center truncate">{name}</p>
+       <button onClick={() => setIsEditing(true)} className="w-full py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest border-2 border-indigo-950 shadow-[0_3px_0_0_rgba(30,27,75,1)] active:translate-y-0.5 active:shadow-none transition-all">Editar</button>
+       
+       {isEditing && (
+         <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4" onClick={() => setIsEditing(false)}>
+            <div className="bg-white text-indigo-950 w-full max-w-md rounded-[3rem] p-10 border-[10px] border-indigo-950 shadow-2xl" onClick={e => e.stopPropagation()}>
+               <h3 className="text-2xl font-black mb-6 uppercase italic tracking-tighter">Figurinha S{week}</h3>
+               <div className="space-y-4">
+                  <input placeholder="Nome da Figurinha" value={name} onChange={e => setName(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl border-4 border-indigo-950 font-black" />
+                  <input placeholder="URL da Imagem" value={url} onChange={e => setUrl(e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl border-4 border-indigo-950 font-black" />
+                  <select value={rarity} onChange={e => setRarity(e.target.value as StickerRarity)} className="w-full p-4 bg-slate-50 rounded-2xl border-4 border-indigo-950 font-black">
+                     {Object.values(StickerRarity).map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <button onClick={() => { onSave(week, url, name, rarity); setIsEditing(false); }} className="w-full py-5 bg-green-500 text-white font-black rounded-2xl border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] uppercase italic">Salvar Figurinha</button>
+               </div>
             </div>
-          </div>
-        </div>
-      )}
-    </>
+         </div>
+       )}
+    </div>
   );
 };
 

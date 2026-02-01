@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { AppData, User, UserRole, AlunoSticker } from '../types';
-import { CheckCircle, Plus, X, User as UserIcon, Trash2, LayoutGrid, Users as UsersIcon, UserCircle, Star, Sparkles, XCircle, BarChart3, ArrowUpDown, Filter, Edit2 } from 'lucide-react';
+import { AppData, User, UserRole } from '../types';
+import { CheckCircle, Plus, LayoutGrid, Users as UsersIcon, UserCircle, Star, XCircle, BarChart3, Edit2, Trash2, X } from 'lucide-react';
 import AvatarPickerModal from './AvatarPickerModal';
-import confetti from 'canvas-confetti';
 
 interface ProfessorDashboardProps {
   user: User;
@@ -25,12 +24,12 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     ciclo: 'Anos Iniciais' as User['ciclo'] 
   });
 
-  // Filtros da Classificação
   const [filterCiclo, setFilterCiclo] = useState<string>('Todos');
   const [filterSerie, setFilterSerie] = useState<string>('');
   const [sortOrder, setSortOrder] = useState<'presenca' | 'falta'>('falta');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
+  // Filtra alunos que pertencem a este professor
   const myStudents = useMemo(() => data.students.filter(s => s.professorId === user.id), [data.students, user.id]);
 
   const handleAddStudent = (e: React.FormEvent) => {
@@ -140,7 +139,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                {myStudents.length} ALUNOS NA TURMA
              </div>
           </div>
-          <p className="text-indigo-300 font-black uppercase text-[10px] tracking-[0.3em] mt-6 italic">Gerenciando o progresso da escola</p>
         </div>
       </div>
 
@@ -159,7 +157,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
       {activeTab === 'grid' && (
         <div className="bg-white rounded-[3rem] p-4 md:p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
            <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950 mb-8 border-b-4 border-indigo-50 pb-4">Frequência da Turma</h2>
-           
            <div className="overflow-x-auto custom-scrollbar">
              <table className="w-full text-left border-separate border-spacing-0">
                <thead>
@@ -188,7 +185,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                       const sticker = data.studentStickers.find(s => s.alunoId === student.id && s.week === w);
                       const isVerde = sticker?.liberada && !sticker?.isFalta;
                       const isVermelho = sticker?.isFalta;
-
                       return (
                         <td key={w} className={`py-4 px-1 border-b-2 border-slate-50 text-center ${w === data.currentWeek ? 'bg-yellow-50/20' : ''}`}>
                           <button 
@@ -208,196 +204,138 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         </div>
       )}
 
-      {activeTab === 'classification' && (
-        <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
-           <div className="flex flex-col md:flex-row gap-6 mb-8 items-center flex-wrap">
-              <div className="flex items-center gap-3">
-                 <Filter size={20} className="text-indigo-600" />
-                 <select value={filterCiclo} onChange={e => setFilterCiclo(e.target.value)} className="px-6 py-3 bg-indigo-50 rounded-2xl border-2 border-indigo-200 font-black text-[11px] uppercase tracking-widest outline-none">
-                   <option>Todos</option>
-                   <option>Anos Iniciais</option>
-                   <option>Anos Finais</option>
-                   <option>Ensino Médio</option>
-                 </select>
-              </div>
-              <input placeholder="Filtrar por série..." value={filterSerie} onChange={e => setFilterSerie(e.target.value)} className="px-6 py-3 bg-indigo-50 rounded-2xl border-2 border-indigo-200 font-black text-[11px] uppercase tracking-widest outline-none" />
-              <div className="flex items-center gap-3 ml-auto">
-                 <button onClick={() => setSortOrder(sortOrder === 'presenca' ? 'falta' : 'presenca')} className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest border-2 transition-all ${sortOrder === 'presenca' ? 'bg-green-500 text-white border-green-600' : 'bg-red-500 text-white border-red-600'}`}>
-                   {sortOrder === 'presenca' ? '✓ Presença' : '✗ Faltas'}
-                 </button>
-                 <button onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')} className="px-4 py-3 bg-indigo-100 rounded-2xl border-2 border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all">
-                   <ArrowUpDown size={18} />
-                 </button>
-              </div>
-           </div>
-
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {classificationData.map((s, idx) => (
-                  <div key={s.id} className="bg-gradient-to-br from-indigo-50 to-white p-8 rounded-[2.5rem] border-4 border-indigo-950 shadow-lg relative overflow-hidden">
-                    <div className="absolute -top-4 -right-4 w-20 h-20 bg-indigo-200 rounded-full opacity-20" />
-                    <div className="relative z-10">
-                      <div className="flex items-center gap-4 mb-6">
-                        <div className="w-16 h-16 bg-white rounded-2xl border-4 border-indigo-950 overflow-hidden flex-shrink-0">
-                           {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" /> : <UserIcon className="w-full h-full text-indigo-200" />}
-                        </div>
-                        <div>
-                          <p className="font-black text-xl uppercase italic tracking-tighter text-indigo-950 leading-none">{s.name}</p>
-                          <p className="text-[9px] font-black text-indigo-400 mt-1 uppercase tracking-widest">{s.serie} • {s.ciclo}</p>
-                        </div>
+      {activeTab === 'students' && (
+        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
+           <button 
+             onClick={() => setIsAddingStudent(true)} 
+             className="w-full py-8 bg-green-500 hover:bg-green-600 text-white rounded-[2.5rem] font-black text-2xl shadow-xl flex items-center justify-center gap-4 uppercase italic transition-all active:scale-95 border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)]"
+           >
+             <Plus size={32} strokeWidth={4} /> Novo Aluno
+           </button>
+           <div className="grid gap-6 md:grid-cols-2">
+              {myStudents.map(s => (
+                <div key={s.id} className="bg-white text-indigo-950 p-8 rounded-[3rem] border-[8px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] flex flex-col gap-4 group transition-all hover:-translate-y-1">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl border-4 border-indigo-950 overflow-hidden bg-slate-100">
+                         {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" /> : <UserCircle size={32} className="text-slate-300 m-auto mt-3" />}
                       </div>
-                      <div className="flex gap-10">
-                        <div className="text-center">
-                           <p className={`text-4xl font-black leading-none ${sortOrder === 'presenca' ? 'text-green-500' : 'text-slate-200'}`}>{s.presencas}</p>
-                           <p className="text-[9px] font-black uppercase text-indigo-300 tracking-widest mt-1">Presente</p>
-                        </div>
-                        <div className="text-center">
-                           <p className={`text-4xl font-black leading-none ${sortOrder === 'falta' ? 'text-red-500' : 'text-slate-200'}`}>{s.faltas}</p>
-                           <p className="text-[9px] font-black uppercase text-indigo-300 tracking-widest mt-1">Faltas</p>
-                        </div>
+                      <div>
+                        <p className="font-black text-2xl uppercase italic tracking-tighter">{s.name}</p>
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{s.serie} • {s.ciclo}</p>
                       </div>
                     </div>
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={() => { 
+                          setEditingStudentId(s.id); 
+                          setEditingStudentForm({ name: s.name, login: s.login, password: s.password || '', serie: s.serie || '', ciclo: s.ciclo || 'Anos Iniciais' }); 
+                        }} 
+                        className="bg-blue-100 p-3 rounded-2xl text-blue-600 hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-200"
+                      >
+                        <Edit2 size={20} strokeWidth={3} />
+                      </button>
+                      <button 
+                        onClick={() => updateData({ students: data.students.filter(x => x.id !== s.id) })} 
+                        className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
+                      >
+                        <Trash2 size={20} strokeWidth={3} />
+                      </button>
+                    </div>
                   </div>
+                  <div className="bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-100 flex justify-between items-center">
+                     <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Acesso:</span>
+                     <span className="font-black text-indigo-600 text-xs">{s.login} / {s.password}</span>
+                  </div>
+                </div>
               ))}
            </div>
         </div>
       )}
 
-      {activeTab === 'students' && (
-        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
-           <button onClick={() => setIsAddingStudent(true)} className="w-full py-8 bg-green-500 hover:bg-green-600 text-white rounded-[2.5rem] font-black text-2xl shadow-xl flex items-center justify-center gap-4 uppercase italic transition-all active:scale-95 border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)]">
-             <Plus size={32} strokeWidth={4} /> Adicionar Aluno
-           </button>
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {myStudents.map(student => (
-                  <div key={student.id} className="bg-white text-indigo-950 p-8 rounded-[3rem] border-[8px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] flex flex-col justify-between group transition-all hover:-translate-y-2">
-                    <div className="space-y-4 mb-8 text-center md:text-left">
-                        <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center text-indigo-600 border-4 border-indigo-950 mx-auto md:mx-0 overflow-hidden shadow-inner">
-                           {getAvatarUrl(student) ? <img src={getAvatarUrl(student)!} className="w-full h-full object-cover" /> : <UserIcon size={32} strokeWidth={3} />}
-                        </div>
-                        <div>
-                          <h3 className="font-black text-2xl uppercase italic tracking-tighter leading-none">{student.name}</h3>
-                          <div className="flex flex-wrap gap-2 mt-3 justify-center md:justify-start">
-                             <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-2 rounded-full border-2 border-indigo-200 italic">Login: <span className="font-bold">{student.login}</span></span>
-                             <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-2 rounded-full border-2 border-indigo-200 italic">Senha: <span className="font-bold">{student.password}</span></span>
-                             <span className="text-[8px] font-black text-white uppercase tracking-widest bg-indigo-950 px-3 py-2 rounded-full italic">{student.serie} | {student.ciclo}</span>
-                          </div>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => { 
-                          setEditingStudentId(student.id); 
-                          setEditingStudentForm({ name: student.name, login: student.login, password: student.password, serie: student.serie || '', ciclo: student.ciclo || 'Anos Iniciais' }); 
-                        }} 
-                        className="flex-1 py-3 bg-blue-100 text-blue-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-200 flex items-center justify-center gap-2"
-                      >
-                        <Edit2 size={16} /> Editar
-                      </button>
-                      <button 
-                        onClick={() => { if(confirm(`Excluir ${student.name}?`)) updateData({ students: data.students.filter(s => s.id !== student.id) }); }} 
-                        className="flex-1 py-3 bg-red-100 text-red-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all border-2 border-red-200"
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  </div>
+      {activeTab === 'classification' && (
+        <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
+           <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950 mb-8">Classificação da Turma</h2>
+           <div className="space-y-4">
+              {classificationData.map((s, idx) => (
+                <div key={s.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
+                   <div className="w-10 h-10 bg-indigo-950 text-white rounded-full flex items-center justify-center font-black italic">{idx + 1}º</div>
+                   <div className="flex-1">
+                      <p className="font-black text-indigo-950 uppercase italic">{s.name}</p>
+                      <p className="text-[9px] font-black text-indigo-400 uppercase">{s.serie}</p>
+                   </div>
+                   <div className="flex gap-4">
+                      <div className="text-center">
+                         <p className="text-[8px] font-black text-green-500 uppercase">Presenças</p>
+                         <p className="text-xl font-black text-indigo-950">{s.presencas}</p>
+                      </div>
+                      <div className="text-center">
+                         <p className="text-[8px] font-black text-red-500 uppercase">Faltas</p>
+                         <p className="text-xl font-black text-indigo-950">{s.faltas}</p>
+                      </div>
+                   </div>
+                </div>
               ))}
+           </div>
+        </div>
+      )}
+
+      {isAddingStudent && (
+        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4" onClick={() => setIsAddingStudent(false)}>
+           <div className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setIsAddingStudent(false)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all"><X size={24} strokeWidth={4}/></button>
+              <h3 className="text-4xl font-black mb-10 text-center italic uppercase tracking-tighter">Novo Aluno</h3>
+              <form onSubmit={handleAddStudent} className="space-y-6">
+                <input required placeholder="Nome do Aluno" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg" />
+                <div className="grid grid-cols-2 gap-6">
+                  <input required placeholder="Login" value={studentForm.login} onChange={e => setStudentForm({...studentForm, login: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
+                  <input required placeholder="Senha" value={studentForm.password} onChange={e => setStudentForm({...studentForm, password: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <input required placeholder="Série (ex: 1A)" value={studentForm.serie} onChange={e => setStudentForm({...studentForm, serie: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
+                  <select value={studentForm.ciclo} onChange={e => setStudentForm({...studentForm, ciclo: e.target.value as any})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black">
+                    <option value="Anos Iniciais">Anos Iniciais</option>
+                    <option value="Anos Finais">Anos Finais</option>
+                    <option value="Ensino Médio">Ensino Médio</option>
+                  </select>
+                </div>
+                <button type="submit" className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95">Salvar Aluno</button>
+              </form>
            </div>
         </div>
       )}
 
       {editingStudentId && (
         <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4" onClick={() => setEditingStudentId(null)}>
-           <div className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setEditingStudentId(null)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all z-20"><X size={24} strokeWidth={4} /></button>
+           <div className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setEditingStudentId(null)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all"><X size={24} strokeWidth={4}/></button>
               <h3 className="text-4xl font-black mb-10 text-center italic uppercase tracking-tighter">Editar Aluno</h3>
               <form onSubmit={handleEditStudent} className="space-y-6">
-                <div className="space-y-2">
-                   <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Nome Completo</label>
-                   <input required placeholder="Ex: João Silva" value={editingStudentForm.name} onChange={e => setEditingStudentForm({...editingStudentForm, name: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 text-lg outline-none focus:bg-white" />
-                </div>
-                
+                <input required placeholder="Nome do Aluno" value={editingStudentForm.name} onChange={e => setEditingStudentForm({...editingStudentForm, name: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg" />
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Série</label>
-                    <input required placeholder="Ex: 1A" value={editingStudentForm.serie} onChange={e => setEditingStudentForm({...editingStudentForm, serie: e.target.value.toUpperCase()})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none uppercase focus:bg-white" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Ciclo</label>
-                    <div className="relative">
-                      <select value={editingStudentForm.ciclo} onChange={e => setEditingStudentForm({...editingStudentForm, ciclo: e.target.value as User['ciclo']})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none appearance-none focus:bg-white">
-                         <option value="Anos Iniciais">Anos Iniciais</option>
-                         <option value="Anos Finais">Anos Finais</option>
-                         <option value="Ensino Médio">Ensino Médio</option>
-                      </select>
-                    </div>
-                  </div>
+                  <input required placeholder="Login" value={editingStudentForm.login} onChange={e => setEditingStudentForm({...editingStudentForm, login: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
+                  <input required placeholder="Senha" value={editingStudentForm.password} onChange={e => setEditingStudentForm({...editingStudentForm, password: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
                 </div>
-
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Usuário</label>
-                    <input required placeholder="Login" value={editingStudentForm.login} onChange={e => setEditingStudentForm({...editingStudentForm, login: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none focus:bg-white" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Senha</label>
-                    <input required placeholder="Senha" value={editingStudentForm.password} onChange={e => setEditingStudentForm({...editingStudentForm, password: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none focus:bg-white" />
-                  </div>
+                  <input required placeholder="Série" value={editingStudentForm.serie} onChange={e => setEditingStudentForm({...editingStudentForm, serie: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
+                  <select value={editingStudentForm.ciclo} onChange={e => setEditingStudentForm({...editingStudentForm, ciclo: e.target.value as any})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black">
+                    <option value="Anos Iniciais">Anos Iniciais</option>
+                    <option value="Anos Finais">Anos Finais</option>
+                    <option value="Ensino Médio">Ensino Médio</option>
+                  </select>
                 </div>
-
-                <button type="submit" className="w-full py-8 bg-indigo-600 text-white font-black rounded-[2.5rem] mt-8 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)]">Salvar Alterações</button>
+                <button type="submit" className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95">Salvar Alterações</button>
               </form>
            </div>
         </div>
       )}
 
       {isAvatarPickerOpen && (
-        <AvatarPickerModal onSelect={(updates) => { onUpdateProfile?.(updates); setIsAvatarPickerOpen(false); confetti(); }} onClose={() => setIsAvatarPickerOpen(false)} />
-      )}
-
-      {isAddingStudent && (
-        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4" onClick={() => setIsAddingStudent(false)}>
-           <div className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setIsAddingStudent(false)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all z-20"><X size={24} strokeWidth={4} /></button>
-              <h3 className="text-4xl font-black mb-10 text-center italic uppercase tracking-tighter">Novo Aluno</h3>
-              <form onSubmit={handleAddStudent} className="space-y-6">
-                <div className="space-y-2">
-                   <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Nome Completo</label>
-                   <input required placeholder="Ex: João Silva" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 text-lg outline-none focus:bg-white" />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Série</label>
-                    <input required placeholder="Ex: 1A" value={studentForm.serie} onChange={e => setStudentForm({...studentForm, serie: e.target.value.toUpperCase()})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none uppercase focus:bg-white" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Ciclo</label>
-                    <div className="relative">
-                      <select value={studentForm.ciclo} onChange={e => setStudentForm({...studentForm, ciclo: e.target.value as User['ciclo']})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none appearance-none focus:bg-white">
-                         <option value="Anos Iniciais">Anos Iniciais</option>
-                         <option value="Anos Finais">Anos Finais</option>
-                         <option value="Ensino Médio">Ensino Médio</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Usuário</label>
-                    <input required placeholder="Login" value={studentForm.login} onChange={e => setStudentForm({...studentForm, login: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none focus:bg-white" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Senha</label>
-                    <input required placeholder="Senha" value={studentForm.password} onChange={e => setStudentForm({...studentForm, password: e.target.value})} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-900 outline-none focus:bg-white" />
-                  </div>
-                </div>
-
-                <button type="submit" className="w-full py-8 bg-green-500 text-white font-black rounded-[2.5rem] mt-8 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)]">Cadastrar no Sistema</button>
-              </form>
-           </div>
-        </div>
+        <AvatarPickerModal 
+          isOpen={isAvatarPickerOpen} 
+          onClose={() => setIsAvatarPickerOpen(false)} 
+          onSelect={(seed) => onUpdateProfile?.({ avatarSeed: seed, avatarUrl: '' })} 
+        />
       )}
     </div>
   );
