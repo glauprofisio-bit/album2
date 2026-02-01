@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+// ✅ Você pode manter hardcoded por enquanto (já está assim no seu repo)
+// (Depois, se quiser, a gente troca pra process.env)
+const supabaseUrl = 'https://bumcjbjnkblzvrjpvafn.supabase.co';
+const supabaseKey = 'sb_publishable_8jjRyS4uqL9yLU6JdpHx9A_l-UgLSYW';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req, res) {
-  // CORS básico (não atrapalha em Vercel; ajuda se algum ambiente bater de fora)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -12,148 +15,107 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { professors, students, stickers, studentStickers, currentWeek } = req.body || {};
+    const { professors, students, stickers, studentStickers, currentWeek } = req.body;
 
-    // 1) Atualiza semana global
-    if (typeof currentWeek === 'number') {
-      const { error } = await supabase
-        .from('app_settings')
-        .upsert({ id: 'global', current_week: currentWeek });
-
-      if (error) throw new Error(`app_settings: ${error.message}`);
+    // 1) Semana global
+    if (currentWeek !== undefined && currentWeek !== null) {
+      await supabase.from('app_settings').upsert({ id: 'global', current_week: currentWeek });
     }
 
-    // 2) Salva professores (upsert por login)
+    // 2) Professores (só UPSERT, sem deletar)
     if (Array.isArray(professors)) {
       for (const p of professors) {
-        if (!p) continue;
-        if (p.id === 'admin') continue;
+        if (!p?.login) continue;
+        if (p.id === 'admin' || p.role === 'ADMIN') continue;
 
-        const payload = {
-          name: p.name || '',
-          login: p.login || '',
+        await supabase.from('professors').upsert({
+          name: p.name || p.login,
+          email: p.email || `${p.login}@escola.com`,
+          login: p.login,
           password: p.password || '',
-          avatar_url: p.avatarUrl || '',
-          avatar_seed: p.avatarSeed || '',
-        };
-
-        if (!payload.login) continue;
-
-        const { error } = await supabase
-          .from('professors')
-          .upsert(payload, { onConflict: 'login' });
-
-        if (error) throw new Error(`professors upsert: ${error.message}`);
+          avatar_url: p.avatarUrl || null,
+          avatar_seed: p.avatarSeed || null
+        }, { onConflict: 'login' });
       }
     }
 
-    // 3) Salva alunos (upsert por login)
+    // 3) Alunos (só UPSERT, sem deletar)
     if (Array.isArray(students)) {
       for (const s of students) {
-        if (!s) continue;
+        if (!s?.login) continue;
 
-        const payload = {
-          name: s.name || '',
-          login: s.login || '',
+        await supabase.from('students').upsert({
+          name: s.name || s.login,
+          email: s.email || `${s.login}@aluno.com`,
+          login: s.login,
           password: s.password || '',
-          professor_id: s.professorId || null,
-          avatar_url: s.avatarUrl || '',
-          avatar_seed: s.avatarSeed || '',
+          professor_id: s.professorId || null,   // ✅ importante
+          avatar_url: s.avatarUrl || null,
+          avatar_seed: s.avatarSeed || null,
           serie: s.serie || null,
-          ciclo: s.ciclo || null,
-        };
-
-        if (!payload.login) continue;
-
-        const { error } = await supabase
-          .from('students')
-          .upsert(payload, { onConflict: 'login' });
-
-        if (error) throw new Error(`students upsert: ${error.message}`);
+          ciclo: s.ciclo || null
+        }, { onConflict: 'login' });
       }
     }
 
-    // 4) Salva figurinhas (upsert por week)
+    // 4) Figurinhas (upsert por week)
     if (Array.isArray(stickers)) {
       for (const st of stickers) {
-        if (!st) continue;
+        if (!st?.week) continue;
 
-        const payload = {
-          week: Number(st.week),
-          name: st.name || '',
+        await supabase.from('stickers').upsert({
+          week: st.week,
+          name: st.name || `Semana ${st.week}`,
           image_url: st.imageUrl || '',
-          rarity: st.rarity || 'NORMAL',
-        };
-
-        if (!payload.week || Number.isNaN(payload.week)) continue;
-
-        const { error } = await supabase
-          .from('stickers')
-          .upsert(payload, { onConflict: 'week' });
-
-        if (error) throw new Error(`stickers upsert: ${error.message}`);
+          rarity: st.rarity || 'NORMAL'
+        }, { onConflict: 'week' });
       }
     }
 
-    // 5) Salva estado da raspadinha (student_stickers)
-    // Aceita alunoId (id do banco) OU alunoLogin. Se vier alunoId mas for login, tenta resolver por login.
-    if (Array.isArray(studentStickers) && studentStickers.length > 0) {
+    // 5) Estado das raspadinhas (student_stickers)
+    if (Array.isArray(studentStickers)) {
+      // Pra funcionar mesmo quando alunoId for “id local”, a gente resolve pelo login.
+      // Puxa todos os alunos do banco 1 vez e cria mapa login -> id
+      const { data: dbStudents } = await supabase.from('students').select('id, login');
+      const loginToId = new Map((dbStudents || []).map(r => [r.login, r.id]));
+
+      // Mapa idLocal -> login (com base no payload students)
+      const idLocalToLogin = new Map((Array.isArray(students) ? students : []).map(s => [s.id, s.login]));
+
       for (const ss of studentStickers) {
-        if (!ss) continue;
+        if (!ss?.week) continue;
 
-        const week = Number(ss.week);
-        if (!week || Number.isNaN(week)) continue;
+        // Tenta descobrir o login do aluno
+        const login =
+          ss.alunoLogin ||
+          idLocalToLogin.get(ss.alunoId) ||
+          null;
 
-        let studentId = ss.alunoId || ss.studentId || null;
-        const alunoLogin = ss.alunoLogin || ss.login || null;
+        // Resolve o student_id real do banco
+        let studentId = null;
 
-        // Se não veio studentId, tenta resolver por login
-        if (!studentId && alunoLogin) {
-          const { data: st, error } = await supabase
-            .from('students')
-            .select('id')
-            .eq('login', alunoLogin)
-            .single();
-
-          if (error) {
-            // se não achou, só pula
-            continue;
-          }
-          studentId = st?.id || null;
-        }
-
-        // Se veio algo em alunoId mas parece ser login, tenta resolver
-        if (studentId && typeof studentId === 'string' && studentId.length < 20 && !alunoLogin) {
-          const { data: st } = await supabase
-            .from('students')
-            .select('id')
-            .eq('login', studentId)
-            .single();
-          studentId = st?.id || null;
+        // Se o alunoId já for UUID real e existir no banco, poderia usar direto.
+        // Mas como é confuso, prioriza login -> id.
+        if (login && loginToId.has(login)) {
+          studentId = loginToId.get(login);
         }
 
         if (!studentId) continue;
 
-        const payload = {
+        await supabase.from('student_stickers').upsert({
           student_id: studentId,
-          week,
+          week: ss.week,
           liberada: !!ss.liberada,
           revelada: !!ss.revelada,
-          reconquistada: !!ss.reconquistada,
-          is_falta: !!ss.isFalta,
-        };
-
-        const { error } = await supabase
-          .from('student_stickers')
-          .upsert(payload, { onConflict: 'student_id,week' });
-
-        if (error) throw new Error(`student_stickers upsert: ${error.message}`);
+          reconquistada: !!ss.reconquistada, // ✅ importante
+          is_falta: !!ss.isFalta
+        }, { onConflict: 'student_id,week' });
       }
     }
 
     return res.status(200).json({ success: true });
-  } catch (err) {
-    const message = err?.message ? err.message : String(err);
-    return res.status(500).json({ error: message });
+  } catch (error) {
+    console.error('Erro no save-data:', error);
+    return res.status(500).json({ error: 'Internal server error', details: String(error?.message || error) });
   }
 }
