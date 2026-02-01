@@ -11,7 +11,18 @@ const emptyStickers: Sticker[] = Array.from({ length: 45 }, (_, i) => ({
 }));
 
 export const initialData: AppData = {
-  professors: [],
+  professors: [
+    {
+      id: 'prof-1',
+      name: 'Tati',
+      email: 'tati@escola.com',
+      login: 'Tati',
+      password: '385126',
+      role: 'professor',
+      avatarUrl: '',
+      avatarSeed: ''
+    }
+  ],
   students: [],
   stickers: emptyStickers,
   studentStickers: [],
