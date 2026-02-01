@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { User } from '../types';
-import { X, Sparkles, Wand2, ShieldAlert, Heart, Briefcase, Key } from 'lucide-react';
+import { X, Sparkles, Wand2, ShieldAlert, Heart, Briefcase } from 'lucide-react';
 
 interface AvatarPickerModalProps {
   onSelect: (updates: Partial<User>) => void;
@@ -16,10 +16,6 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
   const [isGenerating, setIsGenerating] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const [error, setError] = useState('');
-  
-  // Recupera a chave do localStorage para não precisar digitar sempre
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('GEMINI_API_KEY_LOCAL') || '');
-  const [showKeyInput, setShowKeyInput] = useState(!apiKey);
 
   const randomSeeds = useMemo(() => Array.from({ length: 12 }, () => Math.random().toString(36).substring(7)), []);
 
@@ -32,11 +28,6 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
   }, [isGenerating, countdown]);
 
   const generateMagicSticker = async () => {
-    if (!apiKey.trim()) {
-      setError('Por favor, configure sua Chave API do Google! 🔑');
-      setShowKeyInput(true);
-      return;
-    }
     if (!animal.trim() || !projetoVida.trim()) {
       setError('Preencha os dois campos! ✨');
       return;
@@ -45,43 +36,22 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
     setIsGenerating(true);
     setError('');
     setCountdown(30);
-    
-    // Salva a chave localmente para conveniência
-    localStorage.setItem('GEMINI_API_KEY_LOCAL', apiKey.trim());
 
     try {
-      const subject = `A cute circular profile sticker in 3D clay style, white background, centered. Subject: A ${animal} working as a ${projetoVida}. Educational and safe for children. High quality, detailed 3D render.`;
-      
-      // CHAMADA DIRETA AO GOOGLE (Ignora o timeout da Vercel)
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateImages?key=${apiKey.trim()}`;
-      
-      const response = await fetch(url, {
+      const response = await fetch('/api/generate-avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: subject,
-          numberOfImages: 1,
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
-          ]
-        })
+        body: JSON.stringify({ animal, projetoVida })
       });
-
+      
       const data = await response.json();
 
       if (!response.ok) {
-        const msg = data.error?.message || 'Erro na API do Google. Verifique sua chave!';
-        throw new Error(msg);
+        throw new Error(data.error || 'O Google demorou um pouquinho. Tente de novo!');
       }
 
-      if (data.generatedImages && data.generatedImages[0] && data.generatedImages[0].image) {
-        const base64 = `data:image/png;base64,${data.generatedImages[0].image.imageBytes}`;
-        onSelect({ avatarUrl: base64, avatarSeed: '' });
-      } else {
-        throw new Error('O Google não conseguiu gerar a imagem. Tente outro animal!');
+      if (data.avatarUrl) {
+        onSelect({ avatarUrl: data.avatarUrl, avatarSeed: '' });
       }
     } catch (err: any) {
       setError(err.message || 'Erro na conexão. Tente novamente!');
@@ -104,7 +74,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
 
           <div className="flex bg-slate-100 p-2 rounded-[2rem] border-4 border-indigo-950 mb-8">
              <button onClick={() => setActiveTab('gallery')} className={`flex-1 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'gallery' ? 'bg-indigo-600 text-white shadow-lg border-2 border-white/10' : 'text-indigo-400 hover:bg-white/50'}`}>Galeria</button>
-             <button onClick={() => setActiveTab('magic')} className={`flex-1 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'magic' ? 'bg-slate-800 text-white shadow-lg border-2 border-white/10' : 'text-indigo-400 hover:bg-white/50'}`}><Wand2 size={16}/> Mágica</button>
+             <button onClick={() => setActiveTab('magic')} className={`flex-1 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'magic' ? 'bg-yellow-400 text-indigo-950 shadow-lg border-2 border-indigo-950/10' : 'text-indigo-400 hover:bg-white/50'}`}><Wand2 size={16}/> Mágica</button>
           </div>
 
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar pr-2">
@@ -132,15 +102,6 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {showKeyInput && (
-                      <div className="relative animate-in slide-in-from-top duration-300">
-                        <label className="text-[10px] font-black uppercase text-red-400 ml-4 tracking-widest mb-2 block">Configuração: Chave API do Google</label>
-                        <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Cole sua chave aqui..." className="w-full p-5 pl-12 bg-red-50 rounded-[1.5rem] border-4 border-red-200 font-mono text-xs outline-none focus:bg-white transition-colors" />
-                        <Key className="absolute left-4 top-[42px] text-red-400" size={20} />
-                        <p className="text-[9px] text-red-400 mt-2 ml-4 leading-tight">Sua chave fica salva apenas no seu navegador.</p>
-                      </div>
-                    )}
-                    
                     <div className="relative">
                       <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest mb-2 block">Escolha um animal</label>
                       <input type="text" value={animal} onChange={(e) => setAnimal(e.target.value)} placeholder="Ex: Panda, Leão..." className="w-full p-5 pl-12 bg-slate-50 rounded-[1.5rem] border-4 border-indigo-950 font-black text-indigo-950 text-sm outline-none focus:bg-white transition-colors" />
@@ -162,16 +123,9 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
                 )}
 
                 {!isGenerating && (
-                  <div className="space-y-3">
-                    <button onClick={generateMagicSticker} className="w-full py-6 bg-slate-800 text-white font-black rounded-[2rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-lg uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none">
-                      <Sparkles size={24} fill="currentColor"/> Criar Avatar Mágico
-                    </button>
-                    {apiKey && (
-                      <button onClick={() => setShowKeyInput(!showKeyInput)} className="w-full text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:text-indigo-600 transition-colors">
-                        {showKeyInput ? 'Ocultar Configuração' : 'Alterar Chave API'}
-                      </button>
-                    )}
-                  </div>
+                  <button onClick={generateMagicSticker} className="w-full py-6 bg-yellow-400 text-indigo-950 font-black rounded-[2rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-lg uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none">
+                    <Sparkles size={24} fill="currentColor"/> Criar Avatar Mágico
+                  </button>
                 )}
               </div>
             )}
