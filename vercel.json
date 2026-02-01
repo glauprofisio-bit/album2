@@ -1,18 +1,15 @@
 {
   "rewrites": [
-    { "source": "/api/load-data", "destination": "/api/load-data/index.js" },
-    { "source": "/api/save-data", "destination": "/api/save-data/index.js" },
-    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/generate-avatar.js": {
       "maxDuration": 60
     },
-    "api/load-data/index.js": {
+    "api/load-data.js": {
       "maxDuration": 10
     },
-    "api/save-data/index.js": {
+    "api/save-data.js": {
       "maxDuration": 10
     }
   }

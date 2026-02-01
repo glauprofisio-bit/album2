@@ -1,22 +1,23 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default async function handler(req, res) {
-  // Apenas GET é permitido
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Tenta ler o arquivo de dados
-    const dataPath = path.join(process.cwd(), 'public', 'data.json');
+    const dataPath = path.join(__dirname, '..', 'public', 'data.json');
     
     if (fs.existsSync(dataPath)) {
       const data = fs.readFileSync(dataPath, 'utf-8');
       const parsedData = JSON.parse(data);
       return res.status(200).json(parsedData);
     } else {
-      // Se não existir, retorna dados vazios
       return res.status(200).json({
         professors: [],
         students: [],
