@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(?!data\\.json|api/.*|.*\\..*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/generate-avatar.js": {
