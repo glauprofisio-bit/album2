@@ -6,6 +6,12 @@
   "functions": {
     "api/generate-avatar.js": {
       "maxDuration": 60
+    },
+    "api/load-data/index.js": {
+      "maxDuration": 10
+    },
+    "api/save-data/index.js": {
+      "maxDuration": 10
     }
   }
 }
