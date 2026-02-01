@@ -34,9 +34,6 @@ export const syncWithCloud = async (): Promise<AppData | null> => {
   }
 };
 
-// opcional: se você ainda usa isso no App.tsx para remoção,
-// pode deixar como "não faz nada" por enquanto.
-// A remoção dá pra fazer depois com segurança (sem risco de apagar o banco todo).
-export const deleteFromCloud = async () => {
-  return;
-};
+// Mantém a assinatura pra não quebrar o App.tsx, mas por enquanto não faz nada.
+// (Depois a gente cria endpoints de delete com segurança.)
+export const deleteFromCloud = async () => {};
