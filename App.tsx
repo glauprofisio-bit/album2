@@ -1,5 +1,5 @@
 // Versão Restaurada e Funcional - Deploy Forçado
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { User, UserRole, AppData } from './types';
 import { loadData, saveData, syncWithCloud, initialData } from './db';
 import Login from './views/Login';
@@ -15,28 +15,44 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'ranking'>('dashboard');
   const [isSyncing, setIsSyncing] = useState(true);
 
+  const performSync = useCallback(async (showLoader = true) => {
+    if (showLoader) setIsSyncing(true);
+    try {
+      console.log("Iniciando sincronização com Supabase...");
+      const cloudData = await syncWithCloud();
+      if (cloudData) {
+        setData(cloudData);
+        console.log("Sincronização concluída com sucesso!");
+      } else if (showLoader) {
+        setData(loadData());
+      }
+    } catch (error) {
+      console.error("Falha na sincronização:", error);
+      if (showLoader) setData(loadData());
+    } finally {
+      if (showLoader) setIsSyncing(false);
+    }
+  }, []);
+
   // Sincroniza com a nuvem ao abrir o app
   useEffect(() => {
-    const performSync = async () => {
-      setIsSyncing(true);
-      try {
-        console.log("Iniciando sincronização com Supabase...");
-        const cloudData = await syncWithCloud();
-        if (cloudData) {
-          setData(cloudData);
-          console.log("Sincronização concluída com sucesso!");
-        } else {
-          setData(loadData());
-        }
-      } catch (error) {
-        console.error("Falha na sincronização inicial:", error);
-        setData(loadData());
-      } finally {
-        setIsSyncing(false);
-      }
-    };
-    performSync();
-  }, []);
+    performSync(true);
+  }, [performSync]);
+
+  // Sincronização periódica a cada 30 segundos (Cadeia 1, Passo 4)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      performSync(false);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [performSync]);
+
+  // Sincronização imediata ao mudar de tela (Cadeia 11)
+  useEffect(() => {
+    if (user) {
+      performSync(false);
+    }
+  }, [currentView, user, performSync]);
 
   // Salva na nuvem sempre que os dados mudarem (apenas se não estiver sincronizando)
   useEffect(() => { 

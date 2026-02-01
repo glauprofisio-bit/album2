@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://zcrjsvgjnbzawrnajgva.supabase.co';
-const supabaseKey = 'sb_publishable_t01dpjzy6r1Qdag45eAMvQ_dJtOBG23';
+const supabaseUrl = 'https://bumcjbjnkblzvrjpvafn.supabase.co';
+const supabaseKey = 'sb_publishable_8jjRyS4uqL9yLU6JdpHx9A_l-UgLSYW';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req, res) {
@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     const { data: profs } = await supabase.from('professors').select('*');
     const { data: students } = await supabase.from('students').select('*');
     const { data: stickers } = await supabase.from('stickers').select('*').order('week', { ascending: true });
-    const { data: studentStickers } = await supabase.from('student_stickers').select('*');
+    const { data: studentStickers } = await supabase.from('student_stickers').select('*, students(login), stickers(week)');
 
     const appData = {
       professors: (profs || []).map(p => ({
@@ -47,16 +47,19 @@ export default async function handler(req, res) {
         imageUrl: ''
       })),
       studentStickers: (studentStickers || []).map(ss => ({
-        id: ss.id,
-        studentId: ss.student_id,
-        stickerId: ss.sticker_id,
-        collectedAt: ss.collected_at
+        alunoId: students.find(s => s.id === ss.student_id)?.id || ss.student_id,
+        week: ss.stickers?.week || 0,
+        liberada: true,
+        revelada: true, // No banco simplificado, se existe é porque foi revelada
+        reconquistada: false,
+        date: ss.collected_at
       })),
       currentWeek: 1
     };
 
     return res.status(200).json(appData);
   } catch (error) {
+    console.error('Erro no handler load-data:', error);
     return res.status(500).json({ error: 'Internal server error', details: String(error) });
   }
 }
