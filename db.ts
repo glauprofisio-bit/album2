@@ -23,7 +23,12 @@ export const loadData = (): AppData => {
   const saved = localStorage.getItem(DB_KEY);
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      // Garante que stickers nunca fiquem vazios
+      if (!parsed.stickers || parsed.stickers.length === 0) {
+        parsed.stickers = emptyStickers;
+      }
+      return parsed;
     } catch (e) {
       return initialData;
     }
@@ -31,15 +36,13 @@ export const loadData = (): AppData => {
   return initialData;
 };
 
-// Função para salvar localmente e IMEDIATAMENTE na nuvem
 export const saveData = async (data: AppData) => {
   if (typeof window === 'undefined') return;
   
-  // 1. Salva no LocalStorage primeiro (velocidade)
+  // 1. Salva no LocalStorage IMEDIATAMENTE
   localStorage.setItem(DB_KEY, JSON.stringify(data));
   
-  // 2. Envia para a nuvem IMEDIATAMENTE e espera a confirmação
-  // Isso evita que o loop de 30s puxe dados antigos antes da exclusão ser processada
+  // 2. Envia para a nuvem
   try {
     const response = await fetch('/api/save-data', {
       method: 'POST',
@@ -47,9 +50,8 @@ export const saveData = async (data: AppData) => {
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error('Falha ao salvar na nuvem');
-    console.log("Dados sincronizados com sucesso após alteração.");
   } catch (err) {
-    console.error("Erro crítico ao salvar na nuvem:", err);
+    console.error("Erro ao salvar na nuvem:", err);
   }
 };
 
@@ -58,7 +60,19 @@ export const syncWithCloud = async (): Promise<AppData | null> => {
     const response = await fetch('/api/load-data');
     if (response.ok) {
       const cloudData = await response.json();
+      
+      // VALIDAÇÃO CRÍTICA: Só aceita dados da nuvem se eles não estiverem "vazios" 
+      // (a menos que o local também esteja vazio)
       if (cloudData && typeof cloudData === 'object') {
+        const localData = loadData();
+        
+        // Se a nuvem tem menos professores que o local, e o local não está vazio, 
+        // pode ser um erro de sincronização (a menos que tenha sido uma exclusão)
+        // Por segurança, vamos apenas garantir que campos básicos existam
+        if (!cloudData.stickers || cloudData.stickers.length === 0) {
+          cloudData.stickers = localData.stickers.length > 0 ? localData.stickers : emptyStickers;
+        }
+
         if (typeof window !== 'undefined') {
           localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
         }

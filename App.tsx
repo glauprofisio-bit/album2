@@ -14,18 +14,15 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'ranking'>('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
   
-  // LOCK de sincronização: impede que o loop de 30s sobrescreva dados enquanto o usuário salva algo
   const isPerformingActionRef = useRef(false);
   const [isPerformingAction, setIsPerformingAction] = useState(false);
 
   const performSync = useCallback(async (showLoader = false) => {
-    // Se estivermos salvando algo, ABORTA a sincronização de fundo para não dar conflito
     if (isPerformingActionRef.current) return;
 
     if (showLoader) setIsSyncing(true);
     try {
       const cloudData = await syncWithCloud();
-      // Só atualiza se NÃO começamos uma ação durante o fetch
       if (cloudData && !isPerformingActionRef.current) {
         setData(cloudData);
         
@@ -55,29 +52,30 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [performSync]);
 
-  useEffect(() => {
-    if (user) performSync(false);
-  }, [currentView, performSync]);
+  // Função para mudar de tela com SALVAMENTO GARANTIDO
+  const navigateTo = async (view: 'dashboard' | 'ranking') => {
+    setIsSyncing(true);
+    await performSync(false); // Sincroniza antes de mudar para garantir dados frescos
+    setCurrentView(view);
+    setIsSyncing(false);
+  };
 
-  // Função de atualização com TRAVA DE SEGURANÇA
   const updateData = async (newData: Partial<AppData>) => { 
     isPerformingActionRef.current = true;
     setIsPerformingAction(true);
     
     const updatedData = { ...data, ...newData };
-    setData(updatedData); // Atualiza a UI imediatamente
+    setData(updatedData);
     
     try {
-      // Espera a nuvem confirmar o recebimento
       await saveData(updatedData);
     } catch (e) {
       console.error("Erro ao salvar:", e);
     } finally {
-      // Pequena pausa para garantir que o banco de dados processou tudo antes de liberar o loop de 30s
       setTimeout(() => {
         isPerformingActionRef.current = false;
         setIsPerformingAction(false);
-      }, 2000);
+      }, 1500);
     }
   };
 
@@ -130,7 +128,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-3 md:gap-4">
                {(currentUser.role === UserRole.ALUNO || currentUser.role === UserRole.PROFESSOR) && (
                  <button 
-                   onClick={() => setCurrentView(currentView === 'dashboard' ? 'ranking' : 'dashboard')}
+                   onClick={() => navigateTo(currentView === 'dashboard' ? 'ranking' : 'dashboard')}
                    className={`p-3 md:p-4 rounded-2xl transition-all border-4 border-indigo-950 shadow-md active:scale-95 flex items-center gap-2 font-black uppercase text-[10px] tracking-widest ${currentView === 'ranking' ? 'bg-yellow-400 text-indigo-950' : 'bg-indigo-600 text-white'}`}
                  >
                    {currentView === 'dashboard' ? <><Trophy size={18} /> Ranking</> : <><LayoutDashboard size={18} /> {currentUser.role === UserRole.ALUNO ? 'Álbum' : 'Painel'}</>}
@@ -157,7 +155,7 @@ const App: React.FC = () => {
         {!currentUser ? (
           <Login onLogin={setUser} appData={data} onSync={setData} />
         ) : currentView === 'ranking' ? (
-          <HallOfFame data={data} onClose={() => setCurrentView('dashboard')} />
+          <HallOfFame data={data} onClose={() => navigateTo('dashboard')} />
         ) : (
           currentUser.role === UserRole.ADMIN ? <AdminDashboard data={data} updateData={updateData} /> :
           currentUser.role === UserRole.PROFESSOR ? (

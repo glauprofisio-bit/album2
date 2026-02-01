@@ -12,13 +12,13 @@ export default async function handler(req, res) {
     const { data: profs } = await supabase.from('professors').select('*');
     const { data: students } = await supabase.from('students').select('*');
     const { data: stickers } = await supabase.from('stickers').select('*').order('week', { ascending: true });
-    const { data: studentStickers } = await supabase.from('student_stickers').select('*, stickers(week)');
+    const { data: studentStickers } = await supabase.from('student_stickers').select('*');
+    const { data: settings } = await supabase.from('app_settings').select('current_week').eq('id', 'global').single();
 
     const appData = {
       professors: (profs || []).map(p => ({
         id: p.id,
         name: p.name,
-        email: p.email,
         login: p.login,
         password: p.password,
         role: 'PROFESSOR',
@@ -28,7 +28,6 @@ export default async function handler(req, res) {
       students: (students || []).map(s => ({
         id: s.id,
         name: s.name,
-        email: s.email,
         login: s.login,
         password: s.password,
         role: 'ALUNO',
@@ -39,11 +38,11 @@ export default async function handler(req, res) {
         ciclo: s.ciclo
       })),
       stickers: stickers && stickers.length > 0 ? stickers.map(s => ({
-        id: s.id,
+        id: `sticker-${s.week}`,
         week: s.week,
         name: s.name,
         imageUrl: s.image_url,
-        rarity: s.rarity // Campo de raridade adicionado
+        rarity: s.rarity
       })) : Array.from({ length: 45 }, (_, i) => ({
         id: `sticker-${i + 1}`,
         week: i + 1,
@@ -52,14 +51,14 @@ export default async function handler(req, res) {
         rarity: 'NORMAL'
       })),
       studentStickers: (studentStickers || []).map(ss => ({
-        alunoId: students.find(s => s.id === ss.student_id)?.id || ss.student_id,
-        week: ss.stickers?.week || 0,
-        liberada: true,
-        revelada: true,
-        reconquistada: false,
-        date: ss.collected_at
+        alunoId: ss.student_id,
+        week: ss.week,
+        liberada: ss.liberada,
+        revelada: ss.revelada,
+        isFalta: ss.is_falta,
+        reconquistada: ss.reconquistada
       })),
-      currentWeek: 1
+      currentWeek: settings?.current_week || 1
     };
 
     return res.status(200).json(appData);

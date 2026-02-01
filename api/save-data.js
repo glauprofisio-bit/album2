@@ -9,21 +9,24 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { professors, students, stickers } = req.body;
+    const { professors, students, stickers, currentWeek } = req.body;
 
-    // 1. SINCRONIZAÇÃO DE PROFESSORES
+    // 1. SALVAR SEMANA ATUAL
+    if (currentWeek !== undefined) {
+      await supabase.from('app_settings').upsert({ id: 'global', current_week: currentWeek });
+    }
+
+    // 2. SINCRONIZAÇÃO DE PROFESSORES
     if (professors) {
       const validProfs = professors.filter(p => p.id !== 'admin');
       const profLogins = validProfs.map(p => p.login);
       
-      // DELETAR do banco quem NÃO está na lista enviada pelo Admin
       if (profLogins.length > 0) {
         await supabase.from('professors').delete().not('login', 'in', `(${profLogins.map(l => `"${l}"`).join(',')})`);
       } else {
         await supabase.from('professors').delete().neq('login', 'admin');
       }
 
-      // UPSERT dos professores atuais
       for (const prof of validProfs) {
         await supabase.from('professors').upsert({
           name: prof.name,
@@ -37,7 +40,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 2. SINCRONIZAÇÃO DE ALUNOS
+    // 3. SINCRONIZAÇÃO DE ALUNOS
     if (students) {
       const studentLogins = students.map(s => s.login);
       if (studentLogins.length > 0) {
@@ -65,7 +68,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3. SINCRONIZAÇÃO DE FIGURINHAS
+    // 4. SINCRONIZAÇÃO DE FIGURINHAS
     if (stickers) {
       for (const s of stickers) {
         await supabase.from('stickers').upsert({
