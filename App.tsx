@@ -8,6 +8,9 @@ import StudentDashboard from './views/StudentDashboard';
 import HallOfFame from './views/HallOfFame';
 import { LogOut, Trophy, LayoutDashboard, UserCircle, RefreshCw, Loader2 } from 'lucide-react';
 
+// Versão do App para forçar atualização de cache
+const APP_VERSION = '1.0.5';
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [data, setData] = useState<AppData>(loadData());
@@ -15,10 +18,20 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Ref para evitar que o loop de sincronização rode enquanto estamos salvando
   const isBusyRef = useRef(false);
 
-  // Sincronização de entrada (Nuvem -> App)
+  // AUTO-UPDATE: Verifica se a versão do app mudou e limpa cache se necessário
+  useEffect(() => {
+    const savedVersion = localStorage.getItem('app_version');
+    if (savedVersion !== APP_VERSION) {
+      localStorage.setItem('app_version', APP_VERSION);
+      // Se a versão mudou, recarrega a página ignorando o cache
+      if (savedVersion) {
+        window.location.reload();
+      }
+    }
+  }, []);
+
   const performSync = useCallback(async (showLoader = false) => {
     if (isBusyRef.current) return;
 
@@ -28,7 +41,6 @@ const App: React.FC = () => {
       if (cloudData && !isBusyRef.current) {
         setData(cloudData);
         
-        // Verifica se o usuário logado ainda existe (exclusão remota)
         if (user && user.id !== 'admin') {
           const stillExists = cloudData.professors.find(p => p.login === user.login) || 
                             cloudData.students.find(s => s.login === user.login);
@@ -44,37 +56,30 @@ const App: React.FC = () => {
     }
   }, [user]);
 
-  // Carregamento inicial e sincronização periódica
   useEffect(() => {
     performSync(true);
-    
-    // Loop de 30s (Apenas se não for Admin ou se o Admin estiver inativo)
     const interval = setInterval(() => {
       performSync(false);
     }, 30000);
-    
     return () => clearInterval(interval);
   }, [performSync]);
 
-  // Sincronização ao mudar de tela
   useEffect(() => {
     if (user) performSync(false);
   }, [currentView, performSync]);
 
-  // Função central de atualização de dados (App -> Nuvem)
   const updateData = async (newData: Partial<AppData>) => { 
     isBusyRef.current = true;
     setIsSaving(true);
     
     const updatedData = { ...data, ...newData };
-    setData(updatedData); // Atualização instantânea da UI
+    setData(updatedData);
     
     try {
-      await saveData(updatedData); // Persiste local e nuvem
+      await saveData(updatedData);
     } catch (e) {
       console.error("Erro ao salvar:", e);
     } finally {
-      // Pequeno delay para garantir que a nuvem processou antes de liberar o sync de entrada
       setTimeout(() => {
         isBusyRef.current = false;
         setIsSaving(false);
