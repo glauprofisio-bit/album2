@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, UserRole, AppData } from './types';
-import { loadData, saveData, syncWithCloud } from './db';
+import { loadData, saveData, syncWithCloud, initialData } from './db';
 import Login from './views/Login';
 import AdminDashboard from './views/AdminDashboard';
 import ProfessorDashboard from './views/ProfessorDashboard';
@@ -11,7 +11,7 @@ import { LogOut, Trophy, LayoutDashboard, UserCircle, RefreshCw, Loader2 } from 
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [data, setData] = useState<AppData>(initialData); // Começa vazio para forçar sync
+  const [data, setData] = useState<AppData>(initialData);
   const [currentView, setCurrentView] = useState<'dashboard' | 'ranking'>('dashboard');
   const [isSyncing, setIsSyncing] = useState(true);
 
@@ -26,7 +26,6 @@ const App: React.FC = () => {
           setData(cloudData);
           console.log("Sincronização concluída com sucesso!");
         } else {
-          // Se falhar a nuvem, usa o local como fallback
           setData(loadData());
         }
       } catch (error) {
@@ -193,20 +192,6 @@ const App: React.FC = () => {
       </footer>
     </div>
   );
-};
-
-// Dados iniciais para evitar erros de undefined
-const initialData: AppData = {
-  professors: [],
-  students: [],
-  stickers: Array.from({ length: 45 }, (_, i) => ({
-    id: `sticker-${i + 1}`,
-    week: i + 1,
-    name: i + 1 >= 42 ? `Elo Supremo - Parte ${i - 40}` : `Semana ${i + 1}`,
-    imageUrl: '' 
-  })),
-  studentStickers: [],
-  currentWeek: 1
 };
 
 export default App;
