@@ -24,10 +24,7 @@ export const loadData = (): AppData => {
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      // Garante que stickers nunca fiquem vazios
-      if (!parsed.stickers || parsed.stickers.length === 0) {
-        parsed.stickers = emptyStickers;
-      }
+      if (!parsed.stickers || parsed.stickers.length === 0) parsed.stickers = emptyStickers;
       return parsed;
     } catch (e) {
       return initialData;
@@ -39,54 +36,47 @@ export const loadData = (): AppData => {
 export const saveData = async (data: AppData) => {
   if (typeof window === 'undefined') return;
   
-  // 1. Salva no LocalStorage IMEDIATAMENTE
+  // SALVAMENTO LOCAL É IMEDIATO E SOBERANO
   localStorage.setItem(DB_KEY, JSON.stringify(data));
   
-  // 2. Envia para a nuvem
   try {
     const response = await fetch('/api/save-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error('Falha ao salvar na nuvem');
+    if (!response.ok) throw new Error('Erro na nuvem');
+    console.log("✅ Sincronizado com a nuvem.");
   } catch (err) {
-    console.error("Erro ao salvar na nuvem:", err);
+    console.error("❌ Erro ao enviar para nuvem, mas mantido localmente:", err);
   }
 };
 
+// Sincronização agora é apenas sob demanda ou em momentos específicos
 export const syncWithCloud = async (): Promise<AppData | null> => {
   try {
     const response = await fetch('/api/load-data');
     if (response.ok) {
       const cloudData = await response.json();
       
-      // VALIDAÇÃO CRÍTICA: Só aceita dados da nuvem se eles não estiverem "vazios" 
-      // (a menos que o local também esteja vazio)
       if (cloudData && typeof cloudData === 'object') {
         const localData = loadData();
         
-        // Se a nuvem tem menos professores que o local, e o local não está vazio, 
-        // pode ser um erro de sincronização (a menos que tenha sido uma exclusão)
-        // Por segurança, vamos apenas garantir que campos básicos existam
-        if (!cloudData.stickers || cloudData.stickers.length === 0) {
-          cloudData.stickers = localData.stickers.length > 0 ? localData.stickers : emptyStickers;
+        // PROTEÇÃO CRÍTICA: Se a nuvem vier vazia e o local tiver dados, NÃO SOBRESCREVE
+        const cloudHasData = (cloudData.professors?.length > 0) || (cloudData.stickers?.some((s: any) => s.imageUrl));
+        const localHasData = (localData.professors?.length > 0) || (localData.stickers?.some((s: any) => s.imageUrl));
+
+        if (localHasData && !cloudHasData) {
+          console.warn("⚠️ Nuvem parece vazia. Mantendo dados locais para evitar perda.");
+          return localData;
         }
 
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
-        }
+        localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
         return cloudData;
       }
     }
   } catch (error) {
-    console.error("Erro na sincronização de fundo:", error);
+    console.error("Erro ao buscar dados da nuvem:", error);
   }
   return null;
-};
-
-export const clearData = () => {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(DB_KEY);
-  window.location.reload();
 };

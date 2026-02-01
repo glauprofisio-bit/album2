@@ -13,17 +13,18 @@ const App: React.FC = () => {
   const [data, setData] = useState<AppData>(loadData());
   const [currentView, setCurrentView] = useState<'dashboard' | 'ranking'>('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
-  
-  const isPerformingActionRef = useRef(false);
-  const [isPerformingAction, setIsPerformingAction] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
+  // Sincronização de entrada (Nuvem -> App)
   const performSync = useCallback(async (showLoader = false) => {
-    if (isPerformingActionRef.current) return;
+    // REGRA DE OURO: Se for ADMIN, ele NÃO puxa dados da nuvem automaticamente após o login inicial.
+    // O Admin é quem MANDA os dados. Isso evita que dados antigos da nuvem apaguem o trabalho do Admin.
+    if (user?.role === UserRole.ADMIN && data.professors.length > 0) return;
 
     if (showLoader) setIsSyncing(true);
     try {
       const cloudData = await syncWithCloud();
-      if (cloudData && !isPerformingActionRef.current) {
+      if (cloudData) {
         setData(cloudData);
         
         if (user && user.id !== 'admin') {
@@ -39,43 +40,40 @@ const App: React.FC = () => {
     } finally {
       if (showLoader) setIsSyncing(false);
     }
-  }, [user]);
+  }, [user, data.professors.length]);
 
+  // Carregamento inicial
   useEffect(() => {
     performSync(true);
   }, []);
 
+  // Loop de sincronização apenas para Professores e Alunos
   useEffect(() => {
+    if (user?.role === UserRole.ADMIN) return; // Admin não sofre interferência do loop
+
     const interval = setInterval(() => {
       performSync(false);
     }, 30000);
     return () => clearInterval(interval);
-  }, [performSync]);
+  }, [performSync, user?.role]);
 
-  // Função para mudar de tela com SALVAMENTO GARANTIDO
-  const navigateTo = async (view: 'dashboard' | 'ranking') => {
-    setIsSyncing(true);
-    await performSync(false); // Sincroniza antes de mudar para garantir dados frescos
-    setCurrentView(view);
-    setIsSyncing(false);
-  };
+  // Sincronização ao mudar de tela (apenas para Prof/Aluno)
+  useEffect(() => {
+    if (user && user.role !== UserRole.ADMIN) performSync(false);
+  }, [currentView, performSync, user?.role]);
 
+  // Função de atualização (App -> Nuvem)
   const updateData = async (newData: Partial<AppData>) => { 
-    isPerformingActionRef.current = true;
-    setIsPerformingAction(true);
-    
     const updatedData = { ...data, ...newData };
-    setData(updatedData);
+    setData(updatedData); // Atualiza a UI na hora
     
+    setIsSaving(true);
     try {
-      await saveData(updatedData);
+      await saveData(updatedData); // Manda para a nuvem
     } catch (e) {
-      console.error("Erro ao salvar:", e);
+      console.error("Erro ao salvar na nuvem:", e);
     } finally {
-      setTimeout(() => {
-        isPerformingActionRef.current = false;
-        setIsPerformingAction(false);
-      }, 1500);
+      setIsSaving(false);
     }
   };
 
@@ -91,7 +89,7 @@ const App: React.FC = () => {
 
   const currentUser = useMemo(() => {
     if (!user) return null;
-    if (user.id === 'admin') return user;
+    if (user.id === 'admin') return { ...user, role: UserRole.ADMIN };
     
     const prof = data.professors.find(p => p.login === user.login);
     if (prof) return { ...prof, role: UserRole.PROFESSOR };
@@ -115,7 +113,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
-      {(isSyncing) && !user ? (
+      {(isSyncing || isSaving) && !user ? (
         <div className="min-h-screen bg-indigo-700 flex flex-col items-center justify-center">
           <div className="bg-white p-12 rounded-[3rem] border-[10px] border-indigo-950 shadow-[0_15px_0_0_rgba(30,27,75,1)] flex flex-col items-center gap-6">
             <Loader2 size={64} className="animate-spin text-indigo-600" />
@@ -128,7 +126,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-3 md:gap-4">
                {(currentUser.role === UserRole.ALUNO || currentUser.role === UserRole.PROFESSOR) && (
                  <button 
-                   onClick={() => navigateTo(currentView === 'dashboard' ? 'ranking' : 'dashboard')}
+                   onClick={() => setCurrentView(currentView === 'dashboard' ? 'ranking' : 'dashboard')}
                    className={`p-3 md:p-4 rounded-2xl transition-all border-4 border-indigo-950 shadow-md active:scale-95 flex items-center gap-2 font-black uppercase text-[10px] tracking-widest ${currentView === 'ranking' ? 'bg-yellow-400 text-indigo-950' : 'bg-indigo-600 text-white'}`}
                  >
                    {currentView === 'dashboard' ? <><Trophy size={18} /> Ranking</> : <><LayoutDashboard size={18} /> {currentUser.role === UserRole.ALUNO ? 'Álbum' : 'Painel'}</>}
@@ -138,7 +136,7 @@ const App: React.FC = () => {
                <div className="flex items-center gap-3 ml-2">
                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl border-4 border-indigo-950 bg-slate-100 overflow-hidden flex-shrink-0 relative">
                     {getAvatarUrl(currentUser) ? <img src={getAvatarUrl(currentUser)!} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-indigo-200"><UserCircle size={24} /></div>}
-                    {(isSyncing || isPerformingAction) && <div className="absolute inset-0 bg-white/50 flex items-center justify-center"><RefreshCw size={16} className="animate-spin text-indigo-600" /></div>}
+                    {(isSyncing || isSaving) && <div className="absolute inset-0 bg-white/50 flex items-center justify-center"><RefreshCw size={16} className="animate-spin text-indigo-600" /></div>}
                  </div>
                  <div className="hidden sm:flex flex-col">
                    <h1 className="font-black text-sm md:text-base leading-none tracking-tighter uppercase italic text-indigo-950">{currentUser.name}</h1>
@@ -155,7 +153,7 @@ const App: React.FC = () => {
         {!currentUser ? (
           <Login onLogin={setUser} appData={data} onSync={setData} />
         ) : currentView === 'ranking' ? (
-          <HallOfFame data={data} onClose={() => navigateTo('dashboard')} />
+          <HallOfFame data={data} onClose={() => setCurrentView('dashboard')} />
         ) : (
           currentUser.role === UserRole.ADMIN ? <AdminDashboard data={data} updateData={updateData} /> :
           currentUser.role === UserRole.PROFESSOR ? (
