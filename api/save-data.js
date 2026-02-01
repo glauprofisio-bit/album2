@@ -11,17 +11,16 @@ export default async function handler(req, res) {
   try {
     const { professors, students, stickers } = req.body;
 
-    // 1. SINCRONIZAÇÃO DE PROFESSORES (DINÂMICA TOTAL)
+    // 1. SINCRONIZAÇÃO DE PROFESSORES
     if (professors) {
       const validProfs = professors.filter(p => p.id !== 'admin');
       const profLogins = validProfs.map(p => p.login);
       
       // DELETAR do banco quem NÃO está na lista enviada pelo Admin
-      // Removida qualquer referência fixa a 'Tati'. O Admin manda na lista.
       if (profLogins.length > 0) {
         await supabase.from('professors').delete().not('login', 'in', `(${profLogins.map(l => `"${l}"`).join(',')})`);
       } else {
-        await supabase.from('professors').delete();
+        await supabase.from('professors').delete().neq('login', 'admin');
       }
 
       // UPSERT dos professores atuais

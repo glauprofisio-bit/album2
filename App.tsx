@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { User, UserRole, AppData } from './types';
 import { loadData, saveData, syncWithCloud, initialData } from './db';
 import Login from './views/Login';
@@ -13,18 +13,20 @@ const App: React.FC = () => {
   const [data, setData] = useState<AppData>(loadData());
   const [currentView, setCurrentView] = useState<'dashboard' | 'ranking'>('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // LOCK de sincronização: impede que o loop de 30s sobrescreva dados enquanto o usuário salva algo
+  const isPerformingActionRef = useRef(false);
   const [isPerformingAction, setIsPerformingAction] = useState(false);
 
-  // CADEIA 1: Usuário Abre o App
   const performSync = useCallback(async (showLoader = false) => {
-    // Se o usuário estiver fazendo uma ação (excluir/salvar), NÃO puxamos dados da nuvem
-    // para evitar que o dado antigo sobrescreva a ação que ainda está sendo processada.
-    if (isPerformingAction) return;
+    // Se estivermos salvando algo, ABORTA a sincronização de fundo para não dar conflito
+    if (isPerformingActionRef.current) return;
 
     if (showLoader) setIsSyncing(true);
     try {
       const cloudData = await syncWithCloud();
-      if (cloudData) {
+      // Só atualiza se NÃO começamos uma ação durante o fetch
+      if (cloudData && !isPerformingActionRef.current) {
         setData(cloudData);
         
         if (user && user.id !== 'admin') {
@@ -40,7 +42,7 @@ const App: React.FC = () => {
     } finally {
       if (showLoader) setIsSyncing(false);
     }
-  }, [user, isPerformingAction]);
+  }, [user]);
 
   useEffect(() => {
     performSync(true);
@@ -57,20 +59,26 @@ const App: React.FC = () => {
     if (user) performSync(false);
   }, [currentView, performSync]);
 
-  // CADEIA 2-10: Quando os dados mudam localmente
-  // Agora é ASYNC para garantir que a nuvem confirme antes de liberar a UI
+  // Função de atualização com TRAVA DE SEGURANÇA
   const updateData = async (newData: Partial<AppData>) => { 
+    isPerformingActionRef.current = true;
     setIsPerformingAction(true);
+    
     const updatedData = { ...data, ...newData };
-    setData(updatedData);
+    setData(updatedData); // Atualiza a UI imediatamente
     
-    // Espera a nuvem confirmar a exclusão/alteração
-    await saveData(updatedData);
-    
-    // Pequeno delay para garantir que o Supabase processou a exclusão física
-    setTimeout(() => {
-      setIsPerformingAction(false);
-    }, 1000);
+    try {
+      // Espera a nuvem confirmar o recebimento
+      await saveData(updatedData);
+    } catch (e) {
+      console.error("Erro ao salvar:", e);
+    } finally {
+      // Pequena pausa para garantir que o banco de dados processou tudo antes de liberar o loop de 30s
+      setTimeout(() => {
+        isPerformingActionRef.current = false;
+        setIsPerformingAction(false);
+      }, 2000);
+    }
   };
 
   const updateUserProfile = async (userId: string, profileUpdates: Partial<User>) => {
@@ -109,7 +117,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
-      {(isSyncing || isPerformingAction) && !user ? (
+      {(isSyncing) && !user ? (
         <div className="min-h-screen bg-indigo-700 flex flex-col items-center justify-center">
           <div className="bg-white p-12 rounded-[3rem] border-[10px] border-indigo-950 shadow-[0_15px_0_0_rgba(30,27,75,1)] flex flex-col items-center gap-6">
             <Loader2 size={64} className="animate-spin text-indigo-600" />
