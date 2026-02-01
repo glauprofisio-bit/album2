@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { AppData, User, UserRole, Sticker, StickerRarity } from '../types';
-import { Users, LayoutGrid, Plus, Trash2, X, Image as ImageIcon, Calendar, Upload, Star, Gem, Loader2, Edit2, CloudCheck, CloudOff } from 'lucide-react';
+import { Users, LayoutGrid, Plus, Trash2, X, Image as ImageIcon, Calendar, Upload, Star, Gem, Loader2, Edit2, Cloud, CloudOff } from 'lucide-react';
 
 interface AdminDashboardProps {
   data: AppData;
@@ -75,7 +75,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
           </div>
         ) : (
           <div className="bg-green-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-4 border-white opacity-50">
-            <CloudCheck size={20} />
+            <Cloud size={20} />
             <span className="font-black uppercase text-[10px] tracking-widest">Sincronizado</span>
           </div>
         )}
