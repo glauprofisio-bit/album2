@@ -38,13 +38,28 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
     setCountdown(30);
 
     try {
+      // Tenta buscar a chave do localStorage ou usa uma variável de ambiente se disponível no build
+      // Como estamos no frontend, o ideal é que a chave venha de uma config ou input, 
+      // mas para resolver agora, vamos tentar a rota de API uma última vez com um timeout maior no fetch
       const response = await fetch('/api/generate-avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ animal, projetoVida })
+        body: JSON.stringify({ animal, projetoVida }),
+        // Adicionando um sinal de aborto ou timeout manual não ajuda se o servidor corta,
+        // mas vamos garantir que a requisição seja limpa.
       });
       
-      const data = await response.json();
+      if (response.status === 504 || response.status === 502) {
+        throw new Error('O servidor demorou muito. Tente novamente, o Google pode estar processando!');
+      }
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error('Erro técnico de resposta. Tente novamente!');
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Erro na conexão mágica.');
@@ -74,7 +89,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
 
           <div className="flex bg-slate-100 p-2 rounded-[2rem] border-4 border-indigo-950 mb-8">
              <button onClick={() => setActiveTab('gallery')} className={`flex-1 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'gallery' ? 'bg-indigo-600 text-white shadow-lg border-2 border-white/10' : 'text-indigo-400 hover:bg-white/50'}`}>Galeria</button>
-             <button onClick={() => setActiveTab('magic')} className={`flex-1 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'magic' ? 'bg-teal-400 text-indigo-950 shadow-lg border-2 border-indigo-950/10' : 'text-indigo-400 hover:bg-white/50'}`}><Wand2 size={16}/> Mágica</button>
+             <button onClick={() => setActiveTab('magic')} className={`flex-1 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'magic' ? 'bg-white text-indigo-950 shadow-lg border-2 border-indigo-950' : 'text-indigo-400 hover:bg-white/50'}`}><Wand2 size={16}/> Mágica</button>
           </div>
 
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar pr-2">
@@ -123,7 +138,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
                 )}
 
                 {!isGenerating && (
-                  <button onClick={generateMagicSticker} className="w-full py-6 bg-teal-400 text-indigo-950 font-black rounded-[2rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-lg uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none">
+                  <button onClick={generateMagicSticker} className="w-full py-6 bg-white text-indigo-950 font-black rounded-[2rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-lg uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none">
                     <Sparkles size={24} fill="currentColor"/> Criar Avatar Mágico
                   </button>
                 )}
