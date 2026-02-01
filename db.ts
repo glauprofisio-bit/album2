@@ -48,7 +48,7 @@ export const saveData = async (data: AppData) => {
 
 export const syncWithCloud = async (): Promise<AppData | null> => {
   try {
-    const response = await fetch('/api/load-data');
+    const response = await fetch('/data.json');
     if (response.ok) {
       const cloudData = await response.json();
       if (cloudData && Object.keys(cloudData).length > 0) {
