@@ -52,6 +52,10 @@ export const syncWithCloud = async (): Promise<AppData | null> => {
     if (response.ok) {
       const cloudData = await response.json();
       if (cloudData && Object.keys(cloudData).length > 0) {
+        // Garante que stickers estejam presentes
+        if (!cloudData.stickers || cloudData.stickers.length === 0) {
+          cloudData.stickers = emptyStickers;
+        }
         if (typeof window !== 'undefined') {
           localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
         }
