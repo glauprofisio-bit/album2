@@ -1,3 +1,4 @@
+import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://zcrjsvgjnbzawrnajgva.supabase.co';
@@ -5,9 +6,10 @@ const supabaseKey = 'sb_publishable_t01dpjzy6r1Qdag45eAMvQ_dJtOBG23';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-export default async function handler(req, res) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Content-Type', 'application/json');
+  
   if (req.method !== 'POST') {
-    res.setHeader('Content-Type', 'application/json');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -15,14 +17,12 @@ export default async function handler(req, res) {
     const { login, password, role } = req.body;
 
     if (!login || !password || !role) {
-      res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     // Admin login
     if (role === 'admin') {
       if (login === 'Glau' && password === 'Smart200#') {
-        res.setHeader('Content-Type', 'application/json');
         return res.status(200).json({
           success: true,
           user: {
@@ -34,7 +34,6 @@ export default async function handler(req, res) {
           }
         });
       } else {
-        res.setHeader('Content-Type', 'application/json');
         return res.status(401).json({ error: 'Invalid credentials' });
       }
     }
@@ -49,11 +48,9 @@ export default async function handler(req, res) {
         .single();
 
       if (error || !data) {
-        res.setHeader('Content-Type', 'application/json');
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      res.setHeader('Content-Type', 'application/json');
       return res.status(200).json({
         success: true,
         user: {
@@ -76,11 +73,9 @@ export default async function handler(req, res) {
         .single();
 
       if (error || !data) {
-        res.setHeader('Content-Type', 'application/json');
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      res.setHeader('Content-Type', 'application/json');
       return res.status(200).json({
         success: true,
         user: {
@@ -94,11 +89,9 @@ export default async function handler(req, res) {
       });
     }
 
-    res.setHeader('Content-Type', 'application/json');
     return res.status(400).json({ error: 'Invalid role' });
   } catch (error) {
     console.error('Login error:', error);
-    res.setHeader('Content-Type', 'application/json');
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', details: String(error) });
   }
 }
