@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { User, UserRole, AppData } from './types';
 import { saveData, syncWithCloud, initialData } from './db';
@@ -44,6 +45,8 @@ const App: React.FC = () => {
 
     try {
       await saveData(updatedData);
+    } catch (e) {
+      console.error('Erro ao salvar:', e);
     } finally {
       setTimeout(() => {
         isBusyRef.current = false;
@@ -54,7 +57,6 @@ const App: React.FC = () => {
 
   const currentUser = useMemo(() => {
     if (!user) return null;
-
     if (user.id === 'admin') return { ...user, role: UserRole.ADMIN };
 
     const p = data.professors.find(p => p.login === user.login);
@@ -66,36 +68,25 @@ const App: React.FC = () => {
     return user;
   }, [user, data]);
 
-  const handleUpdateProfile = async (updates: Partial<User>) => {
+  const getAvatarUrl = (u: User) => u.avatarUrl || (u.avatarSeed ? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}` : null);
+
+  const updateCurrentProfile = async (updates: Partial<User>) => {
     if (!currentUser) return;
 
-    // Admin: só muda visual local (não tem tabela)
-    if (currentUser.role === UserRole.ADMIN) {
-      setUser(prev => (prev ? { ...prev, ...updates } : prev));
-      return;
-    }
-
     if (currentUser.role === UserRole.PROFESSOR) {
-      const nextProfessors = data.professors.map(p =>
-        p.login === currentUser.login ? { ...p, ...updates } : p
-      );
-      setUser(prev => (prev ? { ...prev, ...updates } : prev));
-      await updateData({ professors: nextProfessors });
+      const nextProfs = data.professors.map(p => p.id === currentUser.id ? { ...p, ...updates } : p);
+      await updateData({ professors: nextProfs });
+      setUser({ ...currentUser, ...updates });
       return;
     }
 
     if (currentUser.role === UserRole.ALUNO) {
-      const nextStudents = data.students.map(s =>
-        s.login === currentUser.login ? { ...s, ...updates } : s
-      );
-      setUser(prev => (prev ? { ...prev, ...updates } : prev));
+      const nextStudents = data.students.map(s => s.id === currentUser.id ? { ...s, ...updates } : s);
       await updateData({ students: nextStudents });
+      setUser({ ...currentUser, ...updates });
       return;
     }
   };
-
-  const getAvatarUrl = (u: User) =>
-    u.avatarUrl || `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed || u.login}`;
 
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
@@ -114,8 +105,8 @@ const App: React.FC = () => {
                 </button>
 
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-lg border-4 border-indigo-950 overflow-hidden relative">
-                    <img src={getAvatarUrl(currentUser)} alt="avatar" />
+                  <div className="w-10 h-10 rounded-lg border-4 border-indigo-950 overflow-hidden relative bg-slate-100">
+                    {getAvatarUrl(currentUser) ? <img src={getAvatarUrl(currentUser)!} alt="avatar" /> : null}
                     {(isSyncing || isSaving) && (
                       <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
                         <RefreshCw size={14} className="animate-spin text-indigo-600" />
@@ -126,10 +117,7 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <button
-                onClick={() => setUser(null)}
-                className="bg-red-500 p-2 rounded-xl border-4 border-indigo-950 text-white"
-              >
+              <button onClick={() => setUser(null)} className="bg-red-500 p-2 rounded-xl border-4 border-indigo-950 text-white">
                 <LogOut size={20} />
               </button>
             </div>
@@ -141,19 +129,9 @@ const App: React.FC = () => {
             ) : currentUser.role === UserRole.ADMIN ? (
               <AdminDashboard data={data} updateData={updateData} />
             ) : currentUser.role === UserRole.PROFESSOR ? (
-              <ProfessorDashboard
-                user={currentUser as any}
-                data={data}
-                updateData={updateData}
-                onUpdateProfile={handleUpdateProfile}
-              />
+              <ProfessorDashboard user={currentUser} data={data} updateData={updateData} onUpdateProfile={updateCurrentProfile} />
             ) : (
-              <StudentDashboard
-                user={currentUser as any}
-                data={data}
-                updateData={updateData}
-                onUpdateProfile={handleUpdateProfile}
-              />
+              <StudentDashboard user={currentUser} data={data} updateData={updateData} onUpdateProfile={updateCurrentProfile} />
             )}
           </main>
         </>
