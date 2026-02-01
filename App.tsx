@@ -11,7 +11,7 @@ import { LogOut, Trophy, LayoutDashboard, UserCircle, RefreshCw, Loader2 } from 
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [data, setData] = useState<AppData>(loadData());
+  const [data, setData] = useState<AppData>(initialData); // Começa vazio para forçar sync
   const [currentView, setCurrentView] = useState<'dashboard' | 'ranking'>('dashboard');
   const [isSyncing, setIsSyncing] = useState(true);
 
@@ -20,19 +20,18 @@ const App: React.FC = () => {
     const performSync = async () => {
       setIsSyncing(true);
       try {
+        console.log("Iniciando sincronização com Supabase...");
         const cloudData = await syncWithCloud();
         if (cloudData) {
-          // Limpeza profunda de dados corrompidos do Pollinations no carregamento
-          const cleanStudents = (cloudData.students || []).map((s: User) => 
-            s.avatarUrl?.includes('pollinations.ai') ? { ...s, avatarUrl: '' } : s
-          );
-          const cleanProfs = (cloudData.professors || []).map((p: User) => 
-            p.avatarUrl?.includes('pollinations.ai') ? { ...p, avatarUrl: '' } : p
-          );
-          setData({ ...cloudData, students: cleanStudents, professors: cleanProfs });
+          setData(cloudData);
+          console.log("Sincronização concluída com sucesso!");
+        } else {
+          // Se falhar a nuvem, usa o local como fallback
+          setData(loadData());
         }
       } catch (error) {
         console.error("Falha na sincronização inicial:", error);
+        setData(loadData());
       } finally {
         setIsSyncing(false);
       }
@@ -42,7 +41,7 @@ const App: React.FC = () => {
 
   // Salva na nuvem sempre que os dados mudarem (apenas se não estiver sincronizando)
   useEffect(() => { 
-    if (!isSyncing) {
+    if (!isSyncing && data !== initialData) {
       saveData(data);
     }
   }, [data, isSyncing]);
@@ -82,24 +81,20 @@ const App: React.FC = () => {
   };
 
   const getAvatarUrl = (u: User) => {
-    // Limpeza de URLs antigas do Pollinations que estão causando erro de Rate Limit
-    if (u.avatarUrl && u.avatarUrl.includes('pollinations.ai')) {
-      return null;
-    }
+    if (u.avatarUrl && u.avatarUrl.includes('pollinations.ai')) return null;
     if (u.avatarUrl) return u.avatarUrl;
     if (u.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
     return null;
   };
 
-  // Tela de carregamento inicial
   if (isSyncing && !user) {
     return (
       <div className="min-h-screen bg-indigo-700 flex flex-col items-center justify-center font-['Fredoka']">
         <div className="bg-white p-12 rounded-[3rem] border-[10px] border-indigo-950 shadow-[0_15px_0_0_rgba(30,27,75,1)] flex flex-col items-center gap-6">
           <Loader2 size={64} className="animate-spin text-indigo-600" />
           <p className="font-black text-indigo-950 uppercase tracking-widest text-center">
-            Abrindo o Álbum...<br/>
-            <span className="text-[10px] opacity-50">Sincronizando figurinhas</span>
+            Sincronizando com a Nuvem...<br/>
+            <span className="text-[10px] opacity-50">Aguarde um instante</span>
           </p>
         </div>
       </div>
@@ -198,6 +193,20 @@ const App: React.FC = () => {
       </footer>
     </div>
   );
+};
+
+// Dados iniciais para evitar erros de undefined
+const initialData: AppData = {
+  professors: [],
+  students: [],
+  stickers: Array.from({ length: 45 }, (_, i) => ({
+    id: `sticker-${i + 1}`,
+    week: i + 1,
+    name: i + 1 >= 42 ? `Elo Supremo - Parte ${i - 40}` : `Semana ${i + 1}`,
+    imageUrl: '' 
+  })),
+  studentStickers: [],
+  currentWeek: 1
 };
 
 export default App;
