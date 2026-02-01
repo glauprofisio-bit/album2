@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { AppData, Sticker } from './types';
+import { AppData, Sticker, UserRole } from './types';
 
 const supabaseUrl = 'https://zcrjsvgjnbzawrnajgva.supabase.co';
 const supabaseKey = 'sb_publishable_t01dpjzy6r1Qdag45eAMvQ_dJtOBG23';
@@ -42,20 +42,22 @@ export const saveData = async (data: AppData) => {
   
   // Sincronizar com Supabase
   try {
-    // Salvar professores
+    // Salvar professores (exceto o admin hardcoded)
     for (const prof of data.professors) {
+      if (prof.id === 'admin') continue;
+      
       const { error } = await supabase
         .from('professors')
         .upsert({
-          id: prof.id,
+          id: prof.id.includes('-') ? prof.id : undefined, // Usa UUID se disponível
           name: prof.name,
-          email: prof.email,
+          email: prof.email || `${prof.login}@escola.com`,
           login: prof.login,
           password: prof.password,
-          role: prof.role,
+          role: prof.role || UserRole.PROFESSOR,
           avatar_url: prof.avatarUrl,
           avatar_seed: prof.avatarSeed
-        });
+        }, { onConflict: 'login' });
       
       if (error) console.error('Erro ao salvar professor:', error);
     }
@@ -65,13 +67,15 @@ export const saveData = async (data: AppData) => {
       const { error } = await supabase
         .from('students')
         .upsert({
-          id: student.id,
+          id: student.id.includes('-') ? student.id : undefined,
           name: student.name,
-          email: student.email,
+          email: student.email || `${student.login}@aluno.com`,
+          login: student.login,
+          password: student.password,
           professor_id: student.professorId,
           avatar_url: student.avatarUrl,
           avatar_seed: student.avatarSeed
-        });
+        }, { onConflict: 'login' });
       
       if (error) console.error('Erro ao salvar aluno:', error);
     }
@@ -81,11 +85,10 @@ export const saveData = async (data: AppData) => {
       const { error } = await supabase
         .from('student_stickers')
         .upsert({
-          id: ss.id,
           student_id: ss.studentId,
           sticker_id: ss.stickerId,
           collected_at: ss.collectedAt
-        });
+        }, { onConflict: 'student_id,sticker_id' });
       
       if (error) console.error('Erro ao salvar figurinha do aluno:', error);
     }
@@ -132,6 +135,8 @@ export const syncWithCloud = async (): Promise<AppData | null> => {
         id: s.id,
         name: s.name,
         email: s.email,
+        login: s.login,
+        password: s.password,
         professorId: s.professor_id,
         avatarUrl: s.avatar_url,
         avatarSeed: s.avatar_seed
