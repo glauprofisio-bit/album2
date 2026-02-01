@@ -31,3 +31,5 @@ export const syncWithCloud = async (): Promise<AppData | null> => {
     };
   } catch (error) {
     return null;
+  }
+};
