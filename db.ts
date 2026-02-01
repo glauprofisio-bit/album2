@@ -23,13 +23,13 @@ export const syncWithCloud = async (): Promise<AppData | null> => {
     const { data: studs } = await supabase.from('students').select('*');
     const { data: config } = await supabase.from('config').select('*').single();
     return {
-      professors: profs || [],
-      students: studs || [],
-      stickers: [],
-      studentStickers: [],
-      currentWeek: config?.current_week || 1
-    };
-  } catch (error) {
-    return null;
-  }
+        professors: profs || [],
+        students: studs || [],
+        stickers: [],
+        studentStickers: [],
+        currentWeek: config?.current_week || 1
+      };
+    } catch (error) {
+      return null;
+    }
 };
