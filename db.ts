@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { AppData, Sticker, UserRole } from './types';
 
-const supabaseUrl = 'https://zcrjsvgjnbzawrnajgva.supabase.co';
-const supabaseKey = 'sb_publishable_t01dpjzy6r1Qdag45eAMvQ_dJtOBG23';
+// Usa as variáveis de ambiente do Vite configuradas no Vercel
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://zcrjsvgjnbzawrnajgva.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_t01dpjzy6r1Qdag45eAMvQ_dJtOBG23';
+
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 const DB_KEY = 'album_figurinhas_db';
@@ -40,6 +42,7 @@ export const saveData = async (data: AppData) => {
   localStorage.setItem(DB_KEY, JSON.stringify(data));
   
   try {
+    // Tenta salvar via API (Vercel Functions)
     await fetch('/api/save-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

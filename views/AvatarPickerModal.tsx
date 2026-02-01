@@ -1,60 +1,82 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { User } from '../types';
-import { X, Sparkles, Wand2, ShieldAlert, Heart, Briefcase } from 'lucide-react';
+import { X, Sparkles, Wand2, Loader2, ShieldAlert } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 
 interface AvatarPickerModalProps {
   onSelect: (updates: Partial<User>) => void;
   onClose: () => void;
-  userId?: string;
 }
 
-const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose, userId }) => {
+const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose }) => {
   const [activeTab, setActiveTab] = useState<'gallery' | 'magic'>('gallery');
-  const [animal, setAnimal] = useState('');
-  const [projetoVida, setProjetoVida] = useState('');
+  const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [countdown, setCountdown] = useState(30);
   const [error, setError] = useState('');
 
   const randomSeeds = useMemo(() => Array.from({ length: 12 }, () => Math.random().toString(36).substring(7)), []);
 
-  useEffect(() => {
-    let timer: any;
-    if (isGenerating && countdown > 0) {
-      timer = setInterval(() => setCountdown(prev => prev - 1), 1000);
-    }
-    return () => clearInterval(timer);
-  }, [isGenerating, countdown]);
+  const BLOCKED_TERMS = ['penis', 'pênis', 'vagina', 'sexo', 'sexual', 'nude', 'pelado', 'pinto', 'rola', 'buceta', 'caralho', 'porno', 'gore', 'violencia', 'arma', 'sangue'];
+
+  const validatePrompt = (text: string) => {
+    const lowerText = text.toLowerCase();
+    return !BLOCKED_TERMS.some(term => lowerText.includes(term));
+  };
 
   const generateMagicSticker = async () => {
-    if (!animal.trim() || !projetoVida.trim()) {
-      setError('Preencha os dois campos! ✨');
+    if (!prompt.trim()) return;
+    
+    if (!validatePrompt(prompt)) {
+      setError('Epa! Esse termo não é permitido na escola. Use sua criatividade para algo legal! 🎨');
       return;
     }
 
     setIsGenerating(true);
     setError('');
-    setCountdown(30);
 
     try {
-      const response = await fetch('/api/generate-avatar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ animal, projetoVida })
-      });
+      // Pega a chave que você colou no index.html
+      const apiKey = (window as any).process?.env?.API_KEY;
       
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'O Google demorou um pouquinho. Tente de novo!');
+      if (!apiKey || apiKey === 'COLE_SUA_CHAVE_AQUI') {
+        throw new Error('API_KEY_MISSING');
       }
 
-      if (data.avatarUrl) {
-        onSelect({ avatarUrl: data.avatarUrl, avatarSeed: '' });
+      const ai = new GoogleGenAI({ apiKey });
+      const finalPrompt = `A cute circular profile sticker in 3D clay style, white background, centered. Subject: ${prompt}. Educational and safe for children.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+          parts: [{ text: finalPrompt }]
+        },
+        config: {
+          imageConfig: { aspectRatio: "1:1" }
+        }
+      });
+
+      if (!response.candidates?.[0]?.content?.parts) {
+        throw new Error('EMPTY_RESPONSE');
+      }
+
+      const parts = response.candidates[0].content.parts;
+      const imagePart = parts.find(p => p.inlineData);
+      
+      if (imagePart) {
+        onSelect({ 
+          avatarUrl: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`, 
+          avatarSeed: undefined 
+        });
+      } else {
+        setError('Tente descrever de outro jeito! Ex: Um gato de óculos.');
       }
     } catch (err: any) {
-      setError(err.message || 'Erro na conexão. Tente novamente!');
+      if (err.message === 'API_KEY_MISSING') {
+        setError('Falta colar sua chave no arquivo index.html!');
+      } else {
+        setError('Erro na criação. Verifique sua conexão ou a chave de API.');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -62,7 +84,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
 
   return (
     <div className="fixed inset-0 bg-indigo-950/98 backdrop-blur-3xl z-[5000] flex items-center justify-center p-6 animate-in fade-in duration-300">
-       <div className="bg-white rounded-[4rem] w-full max-w-lg p-10 md:p-14 border-[12px] border-indigo-950 shadow-2xl relative">
+       <div className="bg-white rounded-[4rem] w-full max-w-lg p-10 md:p-14 border-[12px] border-indigo-950 shadow-2xl relative" onClick={e => e.stopPropagation()}>
           <button onClick={onClose} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl hover:scale-110 transition-all">
             <X size={24} strokeWidth={4} />
           </button>
@@ -74,73 +96,54 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
 
           <div className="flex bg-slate-100 p-2 rounded-[2rem] border-4 border-indigo-950 mb-8">
              <button onClick={() => setActiveTab('gallery')} className={`flex-1 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'gallery' ? 'bg-indigo-600 text-white shadow-lg border-2 border-white/10' : 'text-indigo-400 hover:bg-white/50'}`}>Galeria</button>
-             <button onClick={() => setActiveTab('magic')} className={`flex-1 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'magic' ? 'bg-indigo-600 text-white shadow-lg border-2 border-white/10' : 'text-indigo-400 hover:bg-white/50'}`}><Wand2 size={16}/> Mágica</button>
+             <button onClick={() => setActiveTab('magic')} className={`flex-1 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'magic' ? 'bg-yellow-400 text-indigo-950 shadow-lg border-2 border-indigo-950/10' : 'text-indigo-400 hover:bg-white/50'}`}><Wand2 size={16}/> Mágica</button>
           </div>
 
-          <div className="max-h-[450px] overflow-y-auto custom-scrollbar pr-2">
+          <div className="max-h-[350px] overflow-y-auto custom-scrollbar pr-2">
             {activeTab === 'gallery' ? (
               <div className="grid grid-cols-3 md:grid-cols-4 gap-4 pb-4">
                 {randomSeeds.map(seed => (
-                  <button key={seed} onClick={() => onSelect({ avatarSeed: seed, avatarUrl: '' })} className="aspect-square bg-slate-50 rounded-[2rem] border-4 border-slate-100 p-2 hover:border-indigo-600 hover:bg-indigo-50 transition-all group overflow-hidden shadow-sm">
+                  <button 
+                    key={seed}
+                    onClick={() => onSelect({ avatarSeed: seed, avatarUrl: undefined })}
+                    className="aspect-square bg-slate-50 rounded-[2rem] border-4 border-slate-100 p-2 hover:border-indigo-600 hover:bg-indigo-50 transition-all group overflow-hidden shadow-sm"
+                  >
                     <img src={`https://api.dicebear.com/9.x/fun-emoji/svg?seed=${seed}`} className="w-full h-full object-contain group-hover:scale-110 transition-transform" />
                   </button>
                 ))}
               </div>
             ) : (
               <div className="space-y-6">
-                {isGenerating ? (
-                  <div className="py-10 flex flex-col items-center justify-center space-y-8 animate-in zoom-in duration-500">
-                    <div className="relative">
-                      <div className="w-32 h-32 bg-indigo-50 rounded-full border-8 border-indigo-950 flex items-center justify-center relative overflow-hidden">
-                        <Wand2 size={64} className="text-indigo-600 animate-magic-wand" />
-                      </div>
-                    </div>
-                    <div className="text-center space-y-2">
-                      <div className="text-6xl font-black text-indigo-950 tabular-nums">{countdown}</div>
-                      <p className="text-sm font-black text-indigo-600 uppercase italic tracking-tighter animate-pulse">Criando sua figurinha mágica...</p>
-                    </div>
+                <div className="relative">
+                  <textarea 
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Ex: Um astronauta de massinha, robô dourado..."
+                    className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-950 text-sm outline-none placeholder:text-indigo-950/20 resize-none h-32 focus:bg-white transition-colors"
+                  />
+                  <div className="absolute -bottom-4 right-6 bg-indigo-950 text-white text-[8px] font-black px-4 py-2 rounded-full uppercase tracking-widest flex items-center gap-2">
+                    <Sparkles size={10} className="text-yellow-400" /> IA Ativa
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="relative">
-                      <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest mb-2 block">Escolha um animal</label>
-                      <input type="text" value={animal} onChange={(e) => setAnimal(e.target.value)} placeholder="Ex: Panda, Leão..." className="w-full p-5 pl-12 bg-slate-50 rounded-[1.5rem] border-4 border-indigo-950 font-black text-indigo-950 text-sm outline-none focus:bg-white transition-colors" />
-                      <Heart className="absolute left-4 top-[42px] text-indigo-950/30" size={20} />
-                    </div>
-                    <div className="relative">
-                      <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest mb-2 block">Qual é o seu projeto de vida?</label>
-                      <input type="text" value={projetoVida} onChange={(e) => setProjetoVida(e.target.value)} placeholder="Ex: Médico, Astronauta..." className="w-full p-5 pl-12 bg-slate-50 rounded-[1.5rem] border-4 border-indigo-950 font-black text-indigo-950 text-sm outline-none focus:bg-white transition-colors" />
-                      <Briefcase className="absolute left-4 top-[42px] text-indigo-950/30" size={20} />
-                    </div>
-                  </div>
-                )}
+                </div>
 
                 {error && (
-                  <div className="bg-red-50 p-4 rounded-2xl border-2 border-red-100 flex items-center gap-3">
+                  <div className="bg-red-50 p-4 rounded-2xl border-2 border-red-100 flex items-center gap-3 animate-pulse">
                      <ShieldAlert className="text-red-500 shrink-0" size={20} />
                      <p className="text-red-600 text-[10px] font-black uppercase leading-tight">{error}</p>
                   </div>
                 )}
 
-                {!isGenerating && (
-                  <button onClick={generateMagicSticker} className="w-full py-6 bg-red-600 text-white font-black rounded-[2rem] shadow-[0_8px_0_0_rgba(153,27,27,1)] border-[6px] border-indigo-950 text-lg uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none">
-                    <Sparkles size={24} fill="currentColor"/> Criar Avatar Mágico
-                  </button>
-                )}
+                <button 
+                  onClick={generateMagicSticker}
+                  disabled={isGenerating || !prompt.trim()}
+                  className="w-full py-7 bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-950 font-black rounded-[2.5rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-xl uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none"
+                >
+                  {isGenerating ? <><Loader2 className="animate-spin" size={24} strokeWidth={4} /> Criando...</> : <><Sparkles size={24} fill="currentColor"/> Criar Avatar Mágico</>}
+                </button>
               </div>
             )}
           </div>
        </div>
-       <style>{`
-         @keyframes magic-wand {
-           0% { transform: rotate(0deg) translate(0,0); }
-           25% { transform: rotate(20deg) translate(10px, -10px); }
-           50% { transform: rotate(-20deg) translate(-10px, 10px); }
-           75% { transform: rotate(10deg) translate(5px, -5px); }
-           100% { transform: rotate(0deg) translate(0,0); }
-         }
-         .animate-magic-wand { animation: magic-wand 2s infinite ease-in-out; }
-       `}</style>
     </div>
   );
 };

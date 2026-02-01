@@ -45,21 +45,16 @@ const App: React.FC = () => {
     }
   }, [data, isSyncing]);
 
-  const updateData = (newData: Partial<AppData>) => { 
-    setData(prev => ({ ...prev, ...newData })); 
-  };
+  const updateData = (newData: Partial<AppData>) => { setData(prev => ({ ...prev, ...newData })); };
 
+  // Função para atualizar especificamente o perfil do usuário logado
   const updateUserProfile = (userId: string, profileUpdates: Partial<User>) => {
     if (currentUser?.role === UserRole.ALUNO) {
       const newStudents = data.students.map(s => s.id === userId ? { ...s, ...profileUpdates } : s);
       updateData({ students: newStudents });
-      if (user?.id === userId) setUser(prev => prev ? { ...prev, ...profileUpdates } : null);
     } else if (currentUser?.role === UserRole.PROFESSOR) {
       const newProfs = data.professors.map(p => p.id === userId ? { ...p, ...profileUpdates } : p);
       updateData({ professors: newProfs });
-      if (user?.id === userId) setUser(prev => prev ? { ...prev, ...profileUpdates } : null);
-    } else if (currentUser?.role === UserRole.ADMIN) {
-      if (user?.id === userId) setUser(prev => prev ? { ...prev, ...profileUpdates } : null);
     }
   };
 
@@ -86,23 +81,19 @@ const App: React.FC = () => {
     return null;
   };
 
-  if (isSyncing && !user) {
-    return (
-      <div className="min-h-screen bg-indigo-700 flex flex-col items-center justify-center font-['Fredoka']">
-        <div className="bg-white p-12 rounded-[3rem] border-[10px] border-indigo-950 shadow-[0_15px_0_0_rgba(30,27,75,1)] flex flex-col items-center gap-6">
-          <Loader2 size={64} className="animate-spin text-indigo-600" />
-          <p className="font-black text-indigo-950 uppercase tracking-widest text-center">
-            Sincronizando com a Nuvem...<br/>
-            <span className="text-[10px] opacity-50">Aguarde um instante</span>
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
-      {currentUser && (
+      {isSyncing && !user ? (
+        <div className="min-h-screen bg-indigo-700 flex flex-col items-center justify-center font-['Fredoka']">
+          <div className="bg-white p-12 rounded-[3rem] border-[10px] border-indigo-950 shadow-[0_15px_0_0_rgba(30,27,75,1)] flex flex-col items-center gap-6">
+            <Loader2 size={64} className="animate-spin text-indigo-600" />
+            <p className="font-black text-indigo-950 uppercase tracking-widest text-center">
+              Sincronizando com a Nuvem...<br/>
+              <span className="text-[10px] opacity-50">Aguarde um instante</span>
+            </p>
+          </div>
+        </div>
+      ) : currentUser && (
         <header className="p-4 md:p-6 sticky top-0 z-50">
           <div className="max-w-6xl mx-auto bg-white rounded-[2.5rem] p-3 md:p-4 flex justify-between items-center border-[6px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)]">
             <div className="flex items-center gap-3 md:gap-4">
@@ -120,7 +111,7 @@ const App: React.FC = () => {
                )}
                
                <div className="flex items-center gap-3 ml-2">
-                 <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl border-4 border-indigo-950 bg-slate-100 overflow-hidden flex-shrink-0 relative">
+                 <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl border-4 border-indigo-950 bg-slate-100 overflow-hidden flex-shrink-0">
                     {getAvatarUrl(currentUser) ? (
                       <img src={getAvatarUrl(currentUser)!} className="w-full h-full object-cover" />
                     ) : (
@@ -157,17 +148,11 @@ const App: React.FC = () => {
 
       <main className="flex-1 w-full max-w-6xl mx-auto p-4 md:p-6">
         {!currentUser ? (
-          <Login onLogin={setUser} appData={data} onSync={setData} />
+              <Login onLogin={setUser} appData={data} onSync={setData} />
         ) : currentView === 'ranking' ? (
           <HallOfFame data={data} onClose={() => setCurrentView('dashboard')} />
         ) : (
-          currentUser.role === UserRole.ADMIN ? (
-            <AdminDashboard 
-              data={data} 
-              updateData={updateData} 
-              onUpdateProfile={(updates) => updateUserProfile(currentUser.id, updates)} 
-            />
-          ) :
+          currentUser.role === UserRole.ADMIN ? <AdminDashboard data={data} updateData={updateData} /> :
           currentUser.role === UserRole.PROFESSOR ? (
             <ProfessorDashboard 
               user={currentUser} 

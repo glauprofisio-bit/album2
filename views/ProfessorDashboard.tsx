@@ -97,7 +97,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
   }, [myStudents, data.studentStickers, filterCiclo, filterSerie, sortOrder, sortDirection]);
 
   const getAvatarUrl = (u: User) => {
-    if (u.avatarUrl && u.avatarUrl.includes('pollinations.ai')) return null;
     if (u.avatarUrl) return u.avatarUrl;
     if (u.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
     return null;
