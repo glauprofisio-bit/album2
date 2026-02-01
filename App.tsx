@@ -19,12 +19,11 @@ const App: React.FC = () => {
   const performSync = useCallback(async (showLoader = false) => {
     if (isBusyRef.current) return;
     if (showLoader) setIsSyncing(true);
-
     try {
       const cloudData = await syncWithCloud();
       if (cloudData) setData(cloudData);
     } catch (error) {
-      console.error('Erro na sincronização:', error);
+      console.error("Erro na sincronização:", error);
     } finally {
       if (showLoader) setIsSyncing(false);
     }
@@ -36,7 +35,6 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [performSync]);
 
-  // ✅ updateData simples (API only): só salva o estado inteiro
   const updateData = async (newData: Partial<AppData>) => {
     isBusyRef.current = true;
     setIsSaving(true);
@@ -56,7 +54,6 @@ const App: React.FC = () => {
 
   const currentUser = useMemo(() => {
     if (!user) return null;
-
     if (user.id === 'admin') return { ...user, role: UserRole.ADMIN };
 
     const p = data.professors.find(p => p.login === user.login);
@@ -68,8 +65,33 @@ const App: React.FC = () => {
     return user;
   }, [user, data]);
 
-  const getAvatarUrl = (u: User) =>
-    u.avatarUrl || `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.login}`;
+  const getAvatarUrl = (u: User) => u.avatarUrl || `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.login}`;
+
+  const handleUpdateProfile = async (updates: Partial<User>) => {
+    if (!currentUser) return;
+
+    // Atualiza no "user" local para refletir na hora
+    setUser(prev => (prev ? { ...prev, ...updates } : prev));
+
+    // Atualiza nos dados salvos (professors/students)
+    if (currentUser.role === UserRole.PROFESSOR) {
+      const nextProfessors = data.professors.map(p =>
+        p.login === currentUser.login ? { ...p, ...updates } : p
+      );
+      await updateData({ professors: nextProfessors });
+      return;
+    }
+
+    if (currentUser.role === UserRole.ALUNO) {
+      const nextStudents = data.students.map(s =>
+        s.login === currentUser.login ? { ...s, ...updates } : s
+      );
+      await updateData({ students: nextStudents });
+      return;
+    }
+
+    // ADMIN: se você quiser avatar do admin depois, dá pra incluir aqui também.
+  };
 
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
@@ -115,14 +137,18 @@ const App: React.FC = () => {
             ) : currentUser.role === UserRole.ADMIN ? (
               <AdminDashboard data={data} updateData={updateData} />
             ) : currentUser.role === UserRole.PROFESSOR ? (
-              <ProfessorDashboard user={currentUser as any} data={data} updateData={updateData} onUpdateProfile={() => {}} />
+              <ProfessorDashboard
+                user={currentUser as any}
+                data={data}
+                updateData={updateData}
+                onUpdateProfile={handleUpdateProfile}
+              />
             ) : (
               <StudentDashboard
                 user={currentUser as any}
                 data={data}
-                onReveal={() => {}}
                 updateData={updateData}
-                onUpdateProfile={() => {}}
+                onUpdateProfile={handleUpdateProfile}
               />
             )}
           </main>
