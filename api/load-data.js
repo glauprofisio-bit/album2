@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     const { data: profs } = await supabase.from('professors').select('*');
     const { data: students } = await supabase.from('students').select('*');
     const { data: stickers } = await supabase.from('stickers').select('*').order('week', { ascending: true });
-    const { data: studentStickers } = await supabase.from('student_stickers').select('*, students(login), stickers(week)');
+    const { data: studentStickers } = await supabase.from('student_stickers').select('*, stickers(week)');
 
     const appData = {
       professors: (profs || []).map(p => ({
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
         email: p.email,
         login: p.login,
         password: p.password,
-        role: p.role,
+        role: 'PROFESSOR',
         avatarUrl: p.avatar_url,
         avatarSeed: p.avatar_seed
       })),
@@ -31,9 +31,12 @@ export default async function handler(req, res) {
         email: s.email,
         login: s.login,
         password: s.password,
+        role: 'ALUNO',
         professorId: s.professor_id,
         avatarUrl: s.avatar_url,
-        avatarSeed: s.avatar_seed
+        avatarSeed: s.avatar_seed,
+        serie: s.serie,
+        ciclo: s.ciclo
       })),
       stickers: stickers && stickers.length > 0 ? stickers.map(s => ({
         id: s.id,
@@ -50,7 +53,7 @@ export default async function handler(req, res) {
         alunoId: students.find(s => s.id === ss.student_id)?.id || ss.student_id,
         week: ss.stickers?.week || 0,
         liberada: true,
-        revelada: true, // No banco simplificado, se existe é porque foi revelada
+        revelada: true,
         reconquistada: false,
         date: ss.collected_at
       })),

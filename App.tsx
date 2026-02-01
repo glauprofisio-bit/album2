@@ -10,40 +10,41 @@ import { LogOut, Trophy, LayoutDashboard, UserCircle, RefreshCw, Loader2 } from 
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [data, setData] = useState<AppData>(initialData);
+  const [data, setData] = useState<AppData>(loadData());
   const [currentView, setCurrentView] = useState<'dashboard' | 'ranking'>('dashboard');
-  const [isSyncing, setIsSyncing] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const performSync = useCallback(async (showLoader = true) => {
+  // CADEIA 1: Usuário Abre o App
+  // PASSO 2 e 3: Tenta conectar ao Supabase e substitui dados locais se necessário
+  const performSync = useCallback(async (showLoader = false) => {
     if (showLoader) setIsSyncing(true);
     try {
       const cloudData = await syncWithCloud();
       if (cloudData) {
-        // Se o usuário logado não existir mais na nuvem (foi excluído), desloga ele
+        setData(cloudData);
+        
+        // CADEIA 4 e 6: Se o usuário logado foi excluído ou editado na nuvem
         if (user && user.id !== 'admin') {
-          const stillExists = cloudData.professors.some(p => p.login === user.login) || 
-                            cloudData.students.some(s => s.login === user.login);
+          const stillExists = cloudData.professors.find(p => p.login === user.login) || 
+                            cloudData.students.find(s => s.login === user.login);
           if (!stillExists) {
             handleLogout();
-            return;
           }
         }
-        setData(cloudData);
-      } else if (showLoader) {
-        setData(loadData());
       }
     } catch (error) {
       console.error("Falha na sincronização:", error);
-      if (showLoader) setData(loadData());
     } finally {
       if (showLoader) setIsSyncing(false);
     }
   }, [user]);
 
+  // PASSO 2 da Cadeia 1: Executa ao abrir
   useEffect(() => {
     performSync(true);
   }, []);
 
+  // CADEIA 1 - PASSO 4: Sincronização periódica (30 segundos)
   useEffect(() => {
     const interval = setInterval(() => {
       performSync(false);
@@ -51,18 +52,18 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [performSync]);
 
+  // CADEIA 11: Usuário Muda de Tela
+  // PASSO 2: Força sincronização imediata
   useEffect(() => {
     if (user) performSync(false);
-  }, [currentView, user, performSync]);
+  }, [currentView, performSync]);
 
-  useEffect(() => { 
-    if (!isSyncing && data !== initialData) {
-      saveData(data);
-    }
-  }, [data, isSyncing]);
-
+  // CADEIA 2-10: Quando os dados mudam localmente
+  // PASSO 2 e 3: Salva no LocalStorage e envia para o Supabase (via db.ts)
   const updateData = (newData: Partial<AppData>) => { 
-    setData(prev => ({ ...prev, ...newData })); 
+    const updatedData = { ...data, ...newData };
+    setData(updatedData);
+    saveData(updatedData); // Isso já dispara o fetch para a nuvem no db.ts
   };
 
   const updateUserProfile = (userId: string, profileUpdates: Partial<User>) => {

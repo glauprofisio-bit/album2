@@ -1,11 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-import { AppData, Sticker, UserRole } from './types';
-
-// Usa as variáveis de ambiente do Vite configuradas no Vercel
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://bumcjbjnkblzvrjpvafn.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_8jjRyS4uqL9yLU6JdpHx9A_l-UgLSYW';
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
+import { AppData, UserRole, Sticker } from './types';
 
 const DB_KEY = 'album_figurinhas_db';
 
@@ -37,34 +30,34 @@ export const loadData = (): AppData => {
   return initialData;
 };
 
-export const saveData = async (data: AppData) => {
+export const saveData = (data: AppData) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(DB_KEY, JSON.stringify(data));
   
-  try {
-    // Tenta salvar via API (Vercel Functions)
-    await fetch('/api/save-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-  } catch (e) {
-    console.error('Erro ao sincronizar com API:', e);
-  }
+  // PASSO 3 da Cadeia 2-10: Enviar dados locais para a nuvem (Assíncrono)
+  fetch('/api/save-data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).catch(err => console.error("Erro ao salvar na nuvem:", err));
 };
 
 export const syncWithCloud = async (): Promise<AppData | null> => {
   try {
+    // PASSO 2 da Cadeia 1: Puxar dados mais recentes da nuvem
     const response = await fetch('/api/load-data');
     if (response.ok) {
       const cloudData = await response.json();
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+      // PASSO 3 da Cadeia 1: Se dados da nuvem existirem, eles são a verdade absoluta
+      if (cloudData && typeof cloudData === 'object') {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+        }
+        return cloudData;
       }
-      return cloudData;
     }
-  } catch (e) {
-    console.error('Erro ao buscar dados da nuvem via API:', e);
+  } catch (error) {
+    console.error("Erro na sincronização com a nuvem:", error);
   }
   return null;
 };

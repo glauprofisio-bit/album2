@@ -17,16 +17,20 @@ export default async function handler(req, res) {
       const profLogins = validProfs.map(p => p.login);
       
       // Deletar professores que não estão mais na lista (excluídos no app)
-      await supabase.from('professors').delete().not('login', 'in', `(${profLogins.join(',')})`).neq('login', 'Tati');
+      // Mantemos a 'Tati' como proteção se ela estiver na lista original
+      if (profLogins.length > 0) {
+        await supabase.from('professors').delete().not('login', 'in', `(${profLogins.map(l => `"${l}"`).join(',')})`).neq('login', 'Tati');
+      } else {
+        await supabase.from('professors').delete().neq('login', 'Tati');
+      }
 
       for (const prof of validProfs) {
         await supabase.from('professors').upsert({
-          id: prof.id && prof.id.length > 20 ? prof.id : undefined, // Apenas se for UUID real
           name: prof.name,
           email: prof.email || `${prof.login}@escola.com`,
           login: prof.login,
           password: prof.password,
-          role: 'professor', // Força o papel de professor
+          role: 'PROFESSOR',
           avatar_url: prof.avatarUrl,
           avatar_seed: prof.avatarSeed
         }, { onConflict: 'login' });
@@ -36,33 +40,28 @@ export default async function handler(req, res) {
     // 2. Sincronizar Alunos (Upsert + Delete)
     if (students) {
       const studentLogins = students.map(s => s.login);
-      await supabase.from('students').delete().not('login', 'in', `(${studentLogins.join(',')})`);
+      if (studentLogins.length > 0) {
+        await supabase.from('students').delete().not('login', 'in', `(${studentLogins.map(l => `"${l}"`).join(',')})`);
+      } else {
+        await supabase.from('students').delete();
+      }
+
+      // Buscar todos os professores para mapear IDs
+      const { data: dbProfs } = await supabase.from('professors').select('id, login');
 
       for (const student of students) {
-        // Busca o UUID do professor pelo login dele
-        const { data: profData } = await supabase.from('professors').select('id').eq('login', student.professorLogin || 'Tati').single();
-        let profId = profData?.id;
-
-        // Se não achou pelo login, tenta pelo ID que veio do app (se for UUID)
-        if (!profId && student.professorId && student.professorId.length > 20) {
-          profId = student.professorId;
-        }
-
-        // Fallback para o primeiro professor se ainda não tiver ID
-        if (!profId) {
-          const { data: firstProf } = await supabase.from('professors').select('id').limit(1).single();
-          profId = firstProf?.id;
-        }
-
+        const prof = dbProfs?.find(p => p.login === student.professorLogin) || dbProfs?.find(p => p.id === student.professorId) || dbProfs?.[0];
+        
         await supabase.from('students').upsert({
-          id: student.id && student.id.length > 20 ? student.id : undefined,
           name: student.name,
           email: student.email || `${student.login}@aluno.com`,
           login: student.login,
           password: student.password,
-          professor_id: profId,
+          professor_id: prof?.id,
           avatar_url: student.avatarUrl,
-          avatar_seed: student.avatarSeed
+          avatar_seed: student.avatarSeed,
+          serie: student.serie,
+          ciclo: student.ciclo
         }, { onConflict: 'login' });
       }
     }
@@ -83,20 +82,24 @@ export default async function handler(req, res) {
       const { data: dbStudents } = await supabase.from('students').select('id, login');
       const { data: dbStickers } = await supabase.from('stickers').select('id, week');
 
-      // Limpa figurinhas antigas para reinserir as atuais (mais seguro para sincronização total)
-      // Nota: Em produção real usaríamos uma lógica de delta, mas para este app a sincronização total é mais simples
-      
-      for (const ss of studentStickers) {
-        const student = students.find(s => s.id === ss.alunoId);
-        const dbStudent = dbStudents.find(dbs => dbs.login === student?.login);
-        const dbSticker = dbStickers.find(dbs => dbs.week === ss.week);
+      // Para simplificar e garantir consistência, limpamos e reinserimos as relações de figurinhas
+      // Isso evita que figurinhas "desmarcadas" continuem no banco
+      const studentIds = dbStudents?.map(s => s.id) || [];
+      if (studentIds.length > 0) {
+        await supabase.from('student_stickers').delete().in('student_id', studentIds);
+      }
 
-        if (dbStudent && dbSticker) {
-          await supabase.from('student_stickers').upsert({
+      for (const ss of studentStickers) {
+        const studentObj = students?.find(s => s.id === ss.alunoId);
+        const dbStudent = dbStudents?.find(dbs => dbs.login === studentObj?.login);
+        const dbSticker = dbStickers?.find(dbs => dbs.week === ss.week);
+
+        if (dbStudent && dbSticker && ss.liberada) {
+          await supabase.from('student_stickers').insert({
             student_id: dbStudent.id,
             sticker_id: dbSticker.id,
             collected_at: ss.date || new Date().toISOString()
-          }, { onConflict: 'student_id,sticker_id' });
+          });
         }
       }
     }
