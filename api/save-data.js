@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
-    const { professors, students, studentStickers, currentWeek } = req.body;
+    const { professors, students, stickers, studentStickers, currentWeek } = req.body;
 
     // 1. Atualiza Semana Global
     if (currentWeek) {
