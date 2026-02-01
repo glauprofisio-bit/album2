@@ -22,7 +22,14 @@ const App: React.FC = () => {
       try {
         const cloudData = await syncWithCloud();
         if (cloudData) {
-          setData(cloudData);
+          // Limpeza profunda de dados corrompidos do Pollinations no carregamento
+          const cleanStudents = (cloudData.students || []).map((s: User) => 
+            s.avatarUrl?.includes('pollinations.ai') ? { ...s, avatarUrl: '' } : s
+          );
+          const cleanProfs = (cloudData.professors || []).map((p: User) => 
+            p.avatarUrl?.includes('pollinations.ai') ? { ...p, avatarUrl: '' } : p
+          );
+          setData({ ...cloudData, students: cleanStudents, professors: cleanProfs });
         }
       } catch (error) {
         console.error("Falha na sincronização inicial:", error);
@@ -48,9 +55,13 @@ const App: React.FC = () => {
     if (currentUser?.role === UserRole.ALUNO) {
       const newStudents = data.students.map(s => s.id === userId ? { ...s, ...profileUpdates } : s);
       updateData({ students: newStudents });
+      if (user?.id === userId) setUser(prev => prev ? { ...prev, ...profileUpdates } : null);
     } else if (currentUser?.role === UserRole.PROFESSOR) {
       const newProfs = data.professors.map(p => p.id === userId ? { ...p, ...profileUpdates } : p);
       updateData({ professors: newProfs });
+      if (user?.id === userId) setUser(prev => prev ? { ...prev, ...profileUpdates } : null);
+    } else if (currentUser?.role === UserRole.ADMIN) {
+      if (user?.id === userId) setUser(prev => prev ? { ...prev, ...profileUpdates } : null);
     }
   };
 
@@ -71,6 +82,10 @@ const App: React.FC = () => {
   };
 
   const getAvatarUrl = (u: User) => {
+    // Limpeza de URLs antigas do Pollinations que estão causando erro de Rate Limit
+    if (u.avatarUrl && u.avatarUrl.includes('pollinations.ai')) {
+      return null;
+    }
     if (u.avatarUrl) return u.avatarUrl;
     if (u.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
     return null;
@@ -152,7 +167,13 @@ const App: React.FC = () => {
         ) : currentView === 'ranking' ? (
           <HallOfFame data={data} onClose={() => setCurrentView('dashboard')} />
         ) : (
-          currentUser.role === UserRole.ADMIN ? <AdminDashboard data={data} updateData={updateData} /> :
+          currentUser.role === UserRole.ADMIN ? (
+            <AdminDashboard 
+              data={data} 
+              updateData={updateData} 
+              onUpdateProfile={(updates) => updateUserProfile(currentUser.id, updates)} 
+            />
+          ) :
           currentUser.role === UserRole.PROFESSOR ? (
             <ProfessorDashboard 
               user={currentUser} 

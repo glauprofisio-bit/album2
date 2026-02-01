@@ -1,16 +1,20 @@
 
 import React, { useState, useRef } from 'react';
 import { AppData, User, UserRole, Sticker, StickerRarity } from '../types';
-import { Users, LayoutGrid, Plus, Trash2, X, Image as ImageIcon, Calendar, Upload, Star, Gem, Loader2, Edit2 } from 'lucide-react';
+import { Users, LayoutGrid, Plus, Trash2, X, Image as ImageIcon, Calendar, Upload, Star, Gem, Loader2, Edit2, UserCircle } from 'lucide-react';
+import AvatarPickerModal from './AvatarPickerModal';
+import confetti from 'canvas-confetti';
 
 interface AdminDashboardProps {
   data: AppData;
   updateData: (newData: Partial<AppData>) => void;
+  onUpdateProfile?: (updates: Partial<User>) => void;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData, onUpdateProfile }) => {
   const [activeTab, setActiveTab] = useState<'professors' | 'stickers' | 'config'>('professors');
   const [isAddingProf, setIsAddingProf] = useState(false);
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [profForm, setProfForm] = useState({ name: '', email: '', login: '', password: '' });
 
@@ -63,8 +67,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
     updateData({ stickers: newStickers });
   };
 
+  const getAvatarUrl = (u: User) => {
+    if (u.avatarUrl && u.avatarUrl.includes('pollinations.ai')) return null;
+    if (u.avatarUrl) return u.avatarUrl;
+    if (u.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
+    return null;
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="bg-white rounded-[3rem] p-8 md:p-10 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] flex flex-col items-center gap-4 mb-8">
+        <div onClick={() => setIsAvatarPickerOpen(true)} className="relative group cursor-pointer">
+          <div className="w-32 h-32 bg-slate-100 rounded-full border-[6px] border-indigo-950 shadow-xl overflow-hidden relative transition-transform group-hover:scale-105 active:scale-95">
+             {getAvatarUrl(data.professors.find(p => p.role === UserRole.ADMIN) || { name: 'Admin', role: UserRole.ADMIN } as User) ? (
+               <img src={getAvatarUrl(data.professors.find(p => p.role === UserRole.ADMIN) || { name: 'Admin', role: UserRole.ADMIN } as User)!} className="w-full h-full object-cover" />
+             ) : (
+               <div className="w-full h-full flex flex-col items-center justify-center text-indigo-200">
+                  <UserCircle size={48} />
+               </div>
+             )}
+          </div>
+          <div className="absolute -bottom-2 -right-2 bg-yellow-400 p-2 rounded-xl border-4 border-indigo-950 shadow-lg -rotate-12 group-hover:rotate-0 transition-all">
+             <Star size={16} className="text-indigo-950" fill="currentColor" />
+          </div>
+        </div>
+        <div className="text-center">
+          <h2 className="text-3xl font-black italic uppercase tracking-tighter leading-none text-indigo-950">Painel Administrativo</h2>
+          <p className="text-indigo-300 font-black uppercase text-[8px] tracking-[0.3em] mt-2 italic">Controle Total do Sistema</p>
+        </div>
+      </div>
+
       <div className="flex bg-indigo-950 p-2 rounded-[2rem] gap-2 border-4 border-white/20 shadow-xl">
         <button onClick={() => setActiveTab('professors')} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-[1.5rem] transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'professors' ? 'bg-indigo-600 text-white shadow-lg' : 'text-indigo-300 hover:bg-white/5'}`}><Users size={18} /><span>Usuários</span></button>
         <button onClick={() => setActiveTab('stickers')} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-[1.5rem] transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'stickers' ? 'bg-indigo-600 text-white shadow-lg' : 'text-indigo-300 hover:bg-white/5'}`}><LayoutGrid size={18} /><span>Figurinhas</span></button>
@@ -191,6 +223,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
               </form>
            </div>
         </div>
+      )}
+
+      {isAvatarPickerOpen && (
+        <AvatarPickerModal 
+          onSelect={(updates) => { 
+            const admin = data.professors.find(p => p.role === UserRole.ADMIN);
+            if (admin) onUpdateProfile?.(updates);
+            setIsAvatarPickerOpen(false); 
+            confetti(); 
+          }} 
+          onClose={() => setIsAvatarPickerOpen(false)} 
+        />
       )}
     </div>
   );

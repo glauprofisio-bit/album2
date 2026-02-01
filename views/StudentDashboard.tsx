@@ -35,6 +35,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, onRevea
   [myStickers]);
 
   const avatarDisplayUrl = useMemo(() => {
+    if (user.avatarUrl && user.avatarUrl.includes('pollinations.ai')) return null;
     if (user.avatarUrl) return user.avatarUrl;
     if (user.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${user.avatarSeed}`;
     return null;

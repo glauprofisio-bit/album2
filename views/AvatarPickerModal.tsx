@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { User } from '../types';
-import { X, Sparkles, Wand2, Loader2, ShieldAlert } from 'lucide-react';
+import { X, Sparkles, Wand2, Loader2, ShieldAlert, Heart, Briefcase } from 'lucide-react';
 
 interface AvatarPickerModalProps {
   onSelect: (updates: Partial<User>) => void;
@@ -10,7 +10,8 @@ interface AvatarPickerModalProps {
 
 const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose }) => {
   const [activeTab, setActiveTab] = useState<'gallery' | 'magic'>('gallery');
-  const [prompt, setPrompt] = useState('');
+  const [animal, setAnimal] = useState('');
+  const [projetoVida, setProjetoVida] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
 
@@ -18,16 +19,19 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
 
   const BLOCKED_TERMS = ['penis', 'pênis', 'vagina', 'sexo', 'sexual', 'nude', 'pelado', 'pinto', 'rola', 'buceta', 'caralho', 'porno', 'gore', 'violencia', 'arma', 'sangue'];
 
-  const validatePrompt = (text: string) => {
+  const validateText = (text: string) => {
     const lowerText = text.toLowerCase();
     return !BLOCKED_TERMS.some(term => lowerText.includes(term));
   };
 
   const generateMagicSticker = async () => {
-    if (!prompt.trim()) return;
+    if (!animal.trim() || !projetoVida.trim()) {
+      setError('Por favor, preencha os dois campos para a mágica acontecer! ✨');
+      return;
+    }
     
-    if (!validatePrompt(prompt)) {
-      setError('Epa! Esse termo não é permitido na escola. Use sua criatividade para algo legal! 🎨');
+    if (!validateText(animal) || !validateText(projetoVida)) {
+      setError('Epa! Algum termo usado não é permitido na escola. Use sua criatividade para algo legal! 🎨');
       return;
     }
 
@@ -35,12 +39,14 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
     setError('');
 
     try {
-      // MUDANÇA AQUI: Agora chamamos a nossa própria API interna, não o Google diretamente.
-      // Isso resolve o erro de segurança e protege sua chave.
       const response = await fetch('/api/generate-avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ 
+          prompt: `${animal} ${projetoVida}`,
+          animal,
+          projetoVida
+        })
       });
 
       const data = await response.json();
@@ -50,9 +56,8 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
       }
 
       if (data.avatarUrl) {
-        onSelect({ avatarUrl: data.avatarUrl, avatarSeed: undefined });
+        onSelect({ avatarUrl: data.avatarUrl, avatarSeed: '' });
       } else {
-        // Fallback caso a API ainda esteja em configuração
         throw new Error('A IA ainda está sendo configurada no servidor.');
       }
     } catch (err: any) {
@@ -80,13 +85,13 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
              <button onClick={() => setActiveTab('magic')} className={`flex-1 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'magic' ? 'bg-yellow-400 text-indigo-950 shadow-lg border-2 border-indigo-950/10' : 'text-indigo-400 hover:bg-white/50'}`}><Wand2 size={16}/> Mágica</button>
           </div>
 
-          <div className="max-h-[350px] overflow-y-auto custom-scrollbar pr-2">
+          <div className="max-h-[450px] overflow-y-auto custom-scrollbar pr-2">
             {activeTab === 'gallery' ? (
               <div className="grid grid-cols-3 md:grid-cols-4 gap-4 pb-4">
                 {randomSeeds.map(seed => (
                   <button 
                     key={seed}
-                    onClick={() => onSelect({ avatarSeed: seed, avatarUrl: undefined })}
+                    onClick={() => onSelect({ avatarSeed: seed, avatarUrl: '' })}
                     className="aspect-square bg-slate-50 rounded-[2rem] border-4 border-slate-100 p-2 hover:border-indigo-600 hover:bg-indigo-50 transition-all group overflow-hidden shadow-sm"
                   >
                     <img src={`https://api.dicebear.com/9.x/fun-emoji/svg?seed=${seed}`} className="w-full h-full object-contain group-hover:scale-110 transition-transform" />
@@ -95,15 +100,33 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="relative">
-                  <textarea 
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Ex: Um astronauta de massinha, robô dourado, gatinho pirata..."
-                    className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 font-black text-indigo-950 text-sm outline-none placeholder:text-indigo-950/20 resize-none h-32 focus:bg-white transition-colors"
-                  />
-                  <div className="absolute -bottom-4 right-6 bg-indigo-950 text-white text-[8px] font-black px-4 py-2 rounded-full uppercase tracking-widest flex items-center gap-2">
-                    <Sparkles size={10} className="text-yellow-400" /> IA Protegida
+                <div className="space-y-4">
+                  <div className="relative">
+                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest mb-2 block">Escolha um animal</label>
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        value={animal}
+                        onChange={(e) => setAnimal(e.target.value)}
+                        placeholder="Ex: Panda, Leão, Gato..."
+                        className="w-full p-5 pl-12 bg-slate-50 rounded-[1.5rem] border-4 border-indigo-950 font-black text-indigo-950 text-sm outline-none focus:bg-white transition-colors"
+                      />
+                      <Heart className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-950/30" size={20} />
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest mb-2 block">Qual é o seu projeto de vida?</label>
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        value={projetoVida}
+                        onChange={(e) => setProjetoVida(e.target.value)}
+                        placeholder="Ex: Médico, Astronauta, Jogador..."
+                        className="w-full p-5 pl-12 bg-slate-50 rounded-[1.5rem] border-4 border-indigo-950 font-black text-indigo-950 text-sm outline-none focus:bg-white transition-colors"
+                      />
+                      <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-950/30" size={20} />
+                    </div>
                   </div>
                 </div>
 
@@ -116,13 +139,13 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
 
                 <button 
                   onClick={generateMagicSticker}
-                  disabled={isGenerating || !prompt.trim()}
-                  className="w-full py-7 bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-950 font-black rounded-[2.5rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-xl uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none"
+                  disabled={isGenerating || !animal.trim() || !projetoVida.trim()}
+                  className="w-full py-6 bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-950 font-black rounded-[2rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-lg uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none"
                 >
                   {isGenerating ? <><Loader2 className="animate-spin" size={24} strokeWidth={4} /> Criando Figurinha...</> : <><Sparkles size={24} fill="currentColor"/> Criar Avatar Mágico</>}
                 </button>
                 
-                <p className="text-[8px] text-center text-indigo-300 font-black uppercase tracking-widest px-8">A IA não aceita termos inapropriados para ambiente escolar.</p>
+                <p className="text-[8px] text-center text-indigo-300 font-black uppercase tracking-widest px-8">A IA combinará seu animal com sua profissão dos sonhos!</p>
               </div>
             )}
           </div>

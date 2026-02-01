@@ -1,7 +1,14 @@
-
 {
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/save-data.ts": {
+      "maxDuration": 30
+    },
+    "api/generate-avatar.ts": {
+      "maxDuration": 60
+    }
+  }
 }
