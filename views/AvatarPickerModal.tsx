@@ -61,7 +61,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
         throw new Error('A IA ainda está sendo configurada no servidor.');
       }
     } catch (err: any) {
-      setError('Ops! A IA teve um probleminha. Tente novamente em instantes ou use a galeria!');
+      setError(`Erro: ${err.message || 'A IA demorou muito para responder. Tente novamente!'}`);
       console.error(err);
     } finally {
       setIsGenerating(false);
