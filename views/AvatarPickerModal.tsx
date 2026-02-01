@@ -140,7 +140,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
                 <button 
                   onClick={generateMagicSticker}
                   disabled={isGenerating || !animal.trim() || !projetoVida.trim()}
-                  className="w-full py-6 bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-950 font-black rounded-[2rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-lg uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none"
+                  className="w-full py-6 bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-950 font-black rounded-[2rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-lg uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none"
                 >
                   {isGenerating ? <><Loader2 className="animate-spin" size={24} strokeWidth={4} /> Criando Figurinha...</> : <><Sparkles size={24} fill="currentColor"/> Criar Avatar Mágico</>}
                 </button>
