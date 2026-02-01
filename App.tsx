@@ -39,7 +39,6 @@ const App: React.FC = () => {
     isBusyRef.current = true;
     setIsSaving(true);
     
-    // Lógica de Deletar: Compara a lista nova com a antiga
     if (newData.professors) {
       const removed = data.professors.filter(p => !newData.professors?.find(np => np.id === p.id));
       for (const p of removed) await deleteFromCloud('professors', p.id);
