@@ -18,6 +18,7 @@ export const initialData: AppData = {
   currentWeek: 1
 };
 
+// Carrega dados do LocalStorage com fallback para inicial
 export const loadData = (): AppData => {
   if (typeof window === 'undefined') return initialData;
   const saved = localStorage.getItem(DB_KEY);
@@ -33,50 +34,67 @@ export const loadData = (): AppData => {
   return initialData;
 };
 
+// Salva localmente e tenta enviar para a nuvem
 export const saveData = async (data: AppData) => {
   if (typeof window === 'undefined') return;
   
-  // SALVAMENTO LOCAL É IMEDIATO E SOBERANO
+  // 1. Persistência Local Imediata (Soberana)
   localStorage.setItem(DB_KEY, JSON.stringify(data));
   
+  // 2. Sincronização com a Nuvem (Background)
   try {
     const response = await fetch('/api/save-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error('Erro na nuvem');
-    console.log("✅ Sincronizado com a nuvem.");
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.details || 'Erro na nuvem');
+    }
+    console.log("✅ Nuvem atualizada com sucesso.");
   } catch (err) {
-    console.error("❌ Erro ao enviar para nuvem, mas mantido localmente:", err);
+    console.error("❌ Falha ao espelhar na nuvem:", err);
+    // Não lançamos erro para não travar a UI, o LocalStorage já salvou.
   }
 };
 
-// Sincronização agora é apenas sob demanda ou em momentos específicos
-export const syncWithCloud = async (): Promise<AppData | null> => {
+// Busca dados da nuvem e resolve conflitos
+export const syncWithCloud = async (force = false): Promise<AppData | null> => {
   try {
     const response = await fetch('/api/load-data');
-    if (response.ok) {
-      const cloudData = await response.json();
-      
-      if (cloudData && typeof cloudData === 'object') {
-        const localData = loadData();
-        
-        // PROTEÇÃO CRÍTICA: Se a nuvem vier vazia e o local tiver dados, NÃO SOBRESCREVE
-        const cloudHasData = (cloudData.professors?.length > 0) || (cloudData.stickers?.some((s: any) => s.imageUrl));
-        const localHasData = (localData.professors?.length > 0) || (localData.stickers?.some((s: any) => s.imageUrl));
+    if (!response.ok) return null;
+    
+    const cloudData = await response.json();
+    if (!cloudData || typeof cloudData !== 'object') return null;
 
-        if (localHasData && !cloudHasData) {
-          console.warn("⚠️ Nuvem parece vazia. Mantendo dados locais para evitar perda.");
-          return localData;
-        }
+    const localData = loadData();
 
-        localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
-        return cloudData;
-      }
+    // LÓGICA DE PROTEÇÃO CONTRA DADOS VAZIOS
+    // Se a nuvem vier vazia mas o local tiver dados, a nuvem está errada ou resetada.
+    const cloudIsEmpty = cloudData.professors.length === 0 && cloudData.students.length === 0;
+    const localHasData = localData.professors.length > 0 || localData.students.length > 0;
+
+    if (localHasData && cloudIsEmpty && !force) {
+      console.warn("⚠️ Nuvem vazia detectada. Ignorando para proteger dados locais.");
+      // Opcional: Forçar um salvamento do local para a nuvem para "consertar" a nuvem
+      saveData(localData);
+      return localData;
     }
+
+    // Se chegamos aqui, os dados da nuvem são válidos ou o local também está vazio
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+    }
+    return cloudData;
   } catch (error) {
-    console.error("Erro ao buscar dados da nuvem:", error);
+    console.error("Erro na sincronização:", error);
+    return null;
   }
-  return null;
+};
+
+export const clearData = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(DB_KEY);
+  window.location.reload();
 };

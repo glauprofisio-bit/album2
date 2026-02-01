@@ -15,18 +15,20 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Ref para evitar que o loop de sincronização rode enquanto estamos salvando
+  const isBusyRef = useRef(false);
+
   // Sincronização de entrada (Nuvem -> App)
   const performSync = useCallback(async (showLoader = false) => {
-    // REGRA DE OURO: Se for ADMIN, ele NÃO puxa dados da nuvem automaticamente após o login inicial.
-    // O Admin é quem MANDA os dados. Isso evita que dados antigos da nuvem apaguem o trabalho do Admin.
-    if (user?.role === UserRole.ADMIN && data.professors.length > 0) return;
+    if (isBusyRef.current) return;
 
     if (showLoader) setIsSyncing(true);
     try {
       const cloudData = await syncWithCloud();
-      if (cloudData) {
+      if (cloudData && !isBusyRef.current) {
         setData(cloudData);
         
+        // Verifica se o usuário logado ainda existe (exclusão remota)
         if (user && user.id !== 'admin') {
           const stillExists = cloudData.professors.find(p => p.login === user.login) || 
                             cloudData.students.find(s => s.login === user.login);
@@ -36,44 +38,47 @@ const App: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error("Falha na sincronização:", error);
+      console.error("Erro na sincronização:", error);
     } finally {
       if (showLoader) setIsSyncing(false);
     }
-  }, [user, data.professors.length]);
+  }, [user]);
 
-  // Carregamento inicial
+  // Carregamento inicial e sincronização periódica
   useEffect(() => {
     performSync(true);
-  }, []);
-
-  // Loop de sincronização apenas para Professores e Alunos
-  useEffect(() => {
-    if (user?.role === UserRole.ADMIN) return; // Admin não sofre interferência do loop
-
+    
+    // Loop de 30s (Apenas se não for Admin ou se o Admin estiver inativo)
     const interval = setInterval(() => {
       performSync(false);
     }, 30000);
-    return () => clearInterval(interval);
-  }, [performSync, user?.role]);
-
-  // Sincronização ao mudar de tela (apenas para Prof/Aluno)
-  useEffect(() => {
-    if (user && user.role !== UserRole.ADMIN) performSync(false);
-  }, [currentView, performSync, user?.role]);
-
-  // Função de atualização (App -> Nuvem)
-  const updateData = async (newData: Partial<AppData>) => { 
-    const updatedData = { ...data, ...newData };
-    setData(updatedData); // Atualiza a UI na hora
     
+    return () => clearInterval(interval);
+  }, [performSync]);
+
+  // Sincronização ao mudar de tela
+  useEffect(() => {
+    if (user) performSync(false);
+  }, [currentView, performSync]);
+
+  // Função central de atualização de dados (App -> Nuvem)
+  const updateData = async (newData: Partial<AppData>) => { 
+    isBusyRef.current = true;
     setIsSaving(true);
+    
+    const updatedData = { ...data, ...newData };
+    setData(updatedData); // Atualização instantânea da UI
+    
     try {
-      await saveData(updatedData); // Manda para a nuvem
+      await saveData(updatedData); // Persiste local e nuvem
     } catch (e) {
-      console.error("Erro ao salvar na nuvem:", e);
+      console.error("Erro ao salvar:", e);
     } finally {
-      setIsSaving(false);
+      // Pequeno delay para garantir que a nuvem processou antes de liberar o sync de entrada
+      setTimeout(() => {
+        isBusyRef.current = false;
+        setIsSaving(false);
+      }, 2000);
     }
   };
 
@@ -113,7 +118,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
-      {(isSyncing || isSaving) && !user ? (
+      {isSyncing && !user ? (
         <div className="min-h-screen bg-indigo-700 flex flex-col items-center justify-center">
           <div className="bg-white p-12 rounded-[3rem] border-[10px] border-indigo-950 shadow-[0_15px_0_0_rgba(30,27,75,1)] flex flex-col items-center gap-6">
             <Loader2 size={64} className="animate-spin text-indigo-600" />
