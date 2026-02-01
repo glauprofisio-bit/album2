@@ -2,11 +2,7 @@ import { supabase } from './supabaseClient';
 import { AppData } from './types';
 
 export const initialData: AppData = {
-  professors: [],
-  students: [],
-  stickers: [],
-  studentStickers: [],
-  currentWeek: 1
+  professors: [], students: [], stickers: [], studentStickers: [], currentWeek: 1
 };
 
 export const loadData = () => initialData;
@@ -35,9 +31,3 @@ export const syncWithCloud = async (): Promise<AppData | null> => {
     };
   } catch (error) {
     return null;
-  }
-};    };
-  } catch (error) {
-    return null;
-  }
-};
