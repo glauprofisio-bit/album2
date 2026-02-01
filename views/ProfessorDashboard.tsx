@@ -254,10 +254,10 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                            <p className={`text-4xl font-black leading-none ${sortOrder === 'falta' ? 'text-red-500' : 'text-slate-200'}`}>{s.faltas}</p>
                            <p className="text-[9px] font-black uppercase text-indigo-300 tracking-widest mt-1">Faltas</p>
                         </div>
-                     </div>
+                      </div>
+                    </div>
                   </div>
-                ))
-              )}
+              ))}
            </div>
         </div>
       )}
