@@ -1,11 +1,10 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://zcrjsvgjnbzawrnajgva.supabase.co';
 const supabaseKey = 'sb_publishable_t01dpjzy6r1Qdag45eAMvQ_dJtOBG23';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -16,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       for (const prof of professors) {
         if (prof.id === 'admin') continue;
         await supabase.from('professors').upsert({
-          id: prof.id.includes('-') ? prof.id : undefined,
+          id: prof.id && prof.id.includes('-') ? prof.id : undefined,
           name: prof.name,
           email: prof.email || `${prof.login}@escola.com`,
           login: prof.login,
@@ -31,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (students) {
       for (const student of students) {
         await supabase.from('students').upsert({
-          id: student.id.includes('-') ? student.id : undefined,
+          id: student.id && student.id.includes('-') ? student.id : undefined,
           name: student.name,
           email: student.email || `${student.login}@aluno.com`,
           login: student.login,

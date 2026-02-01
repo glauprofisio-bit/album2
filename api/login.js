@@ -1,4 +1,3 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://zcrjsvgjnbzawrnajgva.supabase.co';
@@ -6,7 +5,7 @@ const supabaseKey = 'sb_publishable_t01dpjzy6r1Qdag45eAMvQ_dJtOBG23';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
   
   if (req.method !== 'POST') {
@@ -64,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Student login
-    if (role === 'student') {
+    if (role === 'student' || role === 'aluno') {
       const { data, error } = await supabase
         .from('students')
         .select('*')
@@ -83,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           name: data.name,
           email: data.email,
           login: data.login,
-          role: 'student',
+          role: 'aluno',
           professorId: data.professor_id
         }
       });
