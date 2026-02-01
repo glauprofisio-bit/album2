@@ -3,7 +3,6 @@ import { AppData, Sticker, UserRole } from './types';
 
 const supabaseUrl = 'https://zcrjsvgjnbzawrnajgva.supabase.co';
 const supabaseKey = 'sb_publishable_t01dpjzy6r1Qdag45eAMvQ_dJtOBG23';
-
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 const DB_KEY = 'album_figurinhas_db';
@@ -40,131 +39,35 @@ export const saveData = async (data: AppData) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(DB_KEY, JSON.stringify(data));
   
-  // Sincronizar com Supabase
   try {
-    // Salvar professores (exceto o admin hardcoded)
-    for (const prof of data.professors) {
-      if (prof.id === 'admin') continue;
-      
-      const { error } = await supabase
-        .from('professors')
-        .upsert({
-          id: prof.id.includes('-') ? prof.id : undefined, // Usa UUID se disponível
-          name: prof.name,
-          email: prof.email || `${prof.login}@escola.com`,
-          login: prof.login,
-          password: prof.password,
-          role: prof.role || UserRole.PROFESSOR,
-          avatar_url: prof.avatarUrl,
-          avatar_seed: prof.avatarSeed
-        }, { onConflict: 'login' });
-      
-      if (error) console.error('Erro ao salvar professor:', error);
-    }
-
-    // Salvar alunos
-    for (const student of data.students) {
-      const { error } = await supabase
-        .from('students')
-        .upsert({
-          id: student.id.includes('-') ? student.id : undefined,
-          name: student.name,
-          email: student.email || `${student.login}@aluno.com`,
-          login: student.login,
-          password: student.password,
-          professor_id: student.professorId,
-          avatar_url: student.avatarUrl,
-          avatar_seed: student.avatarSeed
-        }, { onConflict: 'login' });
-      
-      if (error) console.error('Erro ao salvar aluno:', error);
-    }
-
-    // Salvar figurinhas dos alunos
-    for (const ss of data.studentStickers) {
-      const { error } = await supabase
-        .from('student_stickers')
-        .upsert({
-          student_id: ss.studentId,
-          sticker_id: ss.stickerId,
-          collected_at: ss.collectedAt
-        }, { onConflict: 'student_id,sticker_id' });
-      
-      if (error) console.error('Erro ao salvar figurinha do aluno:', error);
-    }
+    await fetch('/api/save-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
   } catch (e) {
-    console.error('Erro ao sincronizar com Supabase:', e);
+    console.error('Erro ao sincronizar com API:', e);
   }
 };
 
 export const syncWithCloud = async (): Promise<AppData | null> => {
   try {
-    // Carregar professores
-    const { data: profData, error: profError } = await supabase
-      .from('professors')
-      .select('*');
-
-    if (profError) throw profError;
-
-    // Carregar alunos
-    const { data: studentData, error: studentError } = await supabase
-      .from('students')
-      .select('*');
-
-    if (studentError) throw studentError;
-
-    // Carregar figurinhas dos alunos
-    const { data: stickerData, error: stickerError } = await supabase
-      .from('student_stickers')
-      .select('*');
-
-    if (stickerError) throw stickerError;
-
-    const cloudData: AppData = {
-      professors: (profData || []).map(p => ({
-        id: p.id,
-        name: p.name,
-        email: p.email,
-        login: p.login,
-        password: p.password,
-        role: p.role,
-        avatarUrl: p.avatar_url,
-        avatarSeed: p.avatar_seed
-      })),
-      students: (studentData || []).map(s => ({
-        id: s.id,
-        name: s.name,
-        email: s.email,
-        login: s.login,
-        password: s.password,
-        professorId: s.professor_id,
-        avatarUrl: s.avatar_url,
-        avatarSeed: s.avatar_seed
-      })),
-      stickers: emptyStickers,
-      studentStickers: (stickerData || []).map(ss => ({
-        id: ss.id,
-        studentId: ss.student_id,
-        stickerId: ss.sticker_id,
-        collectedAt: ss.collected_at
-      })),
-      currentWeek: 1
-    };
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+    const response = await fetch('/api/load-data');
+    if (response.ok) {
+      const cloudData = await response.json();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+      }
+      return cloudData;
     }
-
-    return cloudData;
   } catch (e) {
-    console.error('Erro ao buscar dados da nuvem:', e);
+    console.error('Erro ao buscar dados da nuvem via API:', e);
   }
   return null;
 };
 
 export const clearData = () => {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(DB_KEY);
-    window.location.reload();
-  }
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(DB_KEY);
+  window.location.reload();
 };
