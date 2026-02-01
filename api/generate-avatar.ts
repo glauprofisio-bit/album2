@@ -10,7 +10,10 @@ export default async function handler(req: Request) {
 
   try {
     const { animal, projetoVida } = await req.json();
-    const apiKey = process.env.GEMINI_API_KEY;
+    
+    // Em Edge Runtime, usamos globalThis.process ou apenas process.env se o compilador permitir.
+    // Para evitar erro de TS, acessamos via string.
+    const apiKey = (globalThis as any).process?.env?.GEMINI_API_KEY;
 
     if (!apiKey) {
       return new Response(JSON.stringify({ error: 'Chave API não configurada no Vercel.' }), { status: 500 });
@@ -18,7 +21,6 @@ export default async function handler(req: Request) {
 
     const subject = `A cute circular profile sticker in 3D clay style, white background, centered. Subject: A ${animal} working as a ${projetoVida}. Educational and safe for children. High quality, detailed 3D render.`;
     
-    // Chamada direta para a API do Google Gemini (Imagen 3)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateImages?key=${apiKey}`;
     
     const response = await fetch(url, {
