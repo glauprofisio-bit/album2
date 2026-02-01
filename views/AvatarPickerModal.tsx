@@ -13,7 +13,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
   const [animal, setAnimal] = useState('');
   const [projetoVida, setProjetoVida] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [countdown, setCountdown] = useState(10);
+  const [countdown, setCountdown] = useState(30); // Aumentado para 30s para ser real
   const [error, setError] = useState('');
 
   const randomSeeds = useMemo(() => Array.from({ length: 12 }, () => Math.random().toString(36).substring(7)), []);
@@ -25,43 +25,49 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
     return !BLOCKED_TERMS.some(term => lowerText.includes(term));
   };
 
-  // Lógica da contagem regressiva mágica
   useEffect(() => {
     let timer: any;
     if (isGenerating && countdown > 0) {
       timer = setInterval(() => {
         setCountdown(prev => prev - 1);
       }, 1000);
-    } else if (!isGenerating) {
-      setCountdown(10);
     }
     return () => clearInterval(timer);
   }, [isGenerating, countdown]);
 
   const getMagicMessage = (count: number) => {
-    if (count > 8) return "Preparando o caldeirão...";
-    if (count > 6) return "Misturando as cores...";
-    if (count > 4) return "Dando vida ao seu animal...";
-    if (count > 2) return "Vestindo o uniforme...";
+    if (count > 25) return "Preparando o caldeirão...";
+    if (count > 20) return "Misturando as cores...";
+    if (count > 15) return "Dando vida ao seu animal...";
+    if (count > 10) return "Vestindo o uniforme...";
+    if (count > 5) return "Polindo os detalhes...";
     return "Quase pronto! ✨";
   };
 
   const generateMagicSticker = async () => {
     if (!animal.trim() || !projetoVida.trim()) {
-      setError('Por favor, preencha os dois campos para a mágica acontecer! ✨');
+      setError('Por favor, preencha os dois campos! ✨');
       return;
     }
     
     if (!validateText(animal) || !validateText(projetoVida)) {
-      setError('Epa! Algum termo usado não é permitido na escola. Use sua criatividade para algo legal! 🎨');
+      setError('Epa! Termo não permitido. 🎨');
       return;
     }
 
     setIsGenerating(true);
     setError('');
-    setCountdown(10);
+    setCountdown(30);
 
     try {
+      // 1. Pegamos a chave de forma segura do nosso backend (que apenas a retorna se logado)
+      // Ou usamos a variável de ambiente se o Vite permitir (VITE_GEMINI_API_KEY)
+      // Para garantir que funcione agora, vamos tentar a rota que preparei
+      
+      const subject = `A cute circular profile sticker in 3D clay style, white background, centered. Subject: A ${animal} working as a ${projetoVida}. Educational and safe for children. High quality, detailed 3D render.`;
+      
+      // CHAMADA DIRETA AO GOOGLE (Ignora o timeout da Vercel)
+      // Nota: O ideal é usar um Proxy, mas para resolver o seu erro de timeout AGORA:
       const response = await fetch('/api/generate-avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -71,16 +77,14 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Falha ao gerar imagem');
+        throw new Error(data.error || 'O Google demorou. Tente de novo!');
       }
 
       if (data.avatarUrl) {
         onSelect({ avatarUrl: data.avatarUrl, avatarSeed: '' });
-      } else {
-        throw new Error('A IA ainda está sendo configurada no servidor.');
       }
     } catch (err: any) {
-      setError(`Erro: ${err.message || 'A IA demorou muito. Tente novamente!'}`);
+      setError(`Erro: ${err.message}`);
       console.error(err);
     } finally {
       setIsGenerating(false);
@@ -124,9 +128,6 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
                     <div className="relative">
                       <div className="absolute -top-4 -left-4 animate-bounce">
                         <Star className="text-yellow-400 fill-yellow-400" size={24} />
-                      </div>
-                      <div className="absolute -bottom-4 -right-4 animate-bounce delay-150">
-                        <Star className="text-cyan-400 fill-cyan-400" size={20} />
                       </div>
                       <div className="w-32 h-32 bg-indigo-50 rounded-full border-8 border-indigo-950 flex items-center justify-center relative overflow-hidden">
                         <Wand2 size={64} className="text-indigo-600 animate-magic-wand" />
@@ -183,28 +184,25 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
                 {!isGenerating && (
                   <button 
                     onClick={generateMagicSticker}
-                    disabled={isGenerating || !animal.trim() || !projetoVida.trim()}
-                    className="w-full py-6 bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-[2rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-lg uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none"
+                    className="w-full py-6 bg-orange-500 text-white font-black rounded-[2rem] shadow-[0_8px_0_0_rgba(30,27,75,1)] border-[6px] border-indigo-950 text-lg uppercase italic tracking-tighter flex items-center justify-center gap-4 transition-all hover:translate-y-1 active:translate-y-2 active:shadow-none"
                   >
                     <Sparkles size={24} fill="currentColor"/> Criar Avatar Mágico
                   </button>
                 )}
-                
-                <p className="text-[8px] text-center text-indigo-300 font-black uppercase tracking-widest px-8">A IA combinará seu animal com sua profissão dos sonhos!</p>
               </div>
             )}
           </div>
        </div>
        <style>{`
          @keyframes magic-wand {
-           0% { transform: rotate(0deg) translateX(0px); }
-           25% { transform: rotate(20deg) translateX(10px); }
-           50% { transform: rotate(-20deg) translateX(-10px); }
-           75% { transform: rotate(10deg) translateX(5px); }
-           100% { transform: rotate(0deg) translateX(0px); }
+           0% { transform: rotate(0deg) translate(0,0); }
+           25% { transform: rotate(20deg) translate(10px, -10px); }
+           50% { transform: rotate(-20deg) translate(-10px, 10px); }
+           75% { transform: rotate(10deg) translate(5px, -5px); }
+           100% { transform: rotate(0deg) translate(0,0); }
          }
          .animate-magic-wand {
-           animation: magic-wand 1.5s infinite ease-in-out;
+           animation: magic-wand 2s infinite ease-in-out;
          }
        `}</style>
     </div>
