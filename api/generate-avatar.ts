@@ -1,6 +1,4 @@
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 export const config = {
   runtime: 'edge',
 };
@@ -15,13 +13,14 @@ export default async function handler(req: Request) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'Chave GEMINI_API_KEY não configurada no Vercel.' }), { status: 500 });
+      return new Response(JSON.stringify({ error: 'Chave API não configurada no Vercel.' }), { status: 500 });
     }
 
     const subject = `A cute circular profile sticker in 3D clay style, white background, centered. Subject: A ${animal} working as a ${projetoVida}. Educational and safe for children. High quality, detailed 3D render.`;
+    
+    // Chamada direta para a API do Google Gemini (Imagen 3)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateImages?key=${apiKey}`;
     
-    // Chamada direta ao Google com timeout de 55s (limite da Vercel Pro, mas tentaremos na Free)
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -40,7 +39,7 @@ export default async function handler(req: Request) {
     const data = await response.json();
 
     if (!response.ok) {
-      return new Response(JSON.stringify({ error: data.error?.message || 'Erro na API do Google' }), { status: response.status });
+      return new Response(JSON.stringify({ error: data.error?.message || 'O Google recusou a criação.' }), { status: response.status });
     }
 
     if (data.generatedImages?.[0]?.image?.imageBytes) {
@@ -51,9 +50,9 @@ export default async function handler(req: Request) {
       });
     }
 
-    return new Response(JSON.stringify({ error: 'Imagem não gerada' }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'Imagem não gerada pelo Google.' }), { status: 500 });
 
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: 'O Google demorou. Tente novamente!' }), { status: 504 });
+    return new Response(JSON.stringify({ error: 'Falha na conexão mágica. Tente novamente!' }), { status: 500 });
   }
 }
