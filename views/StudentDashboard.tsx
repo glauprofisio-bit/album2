@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AppData, User, AlunoSticker, Sticker as StickerType, StickerRarity } from '../types';
 import { Lock, X, Star, Trophy, Sparkles, UserCircle, Loader2, Puzzle } from 'lucide-react';
@@ -197,17 +196,33 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, onRevea
       )}
 
       {scratchingSticker && (
-        <ScratchCardModal 
-          sticker={scratchingSticker.data} 
-          onComplete={() => { if (scratchingSticker.data) { setCelebratingSticker({ week: scratchingSticker.week, data: scratchingSticker.data }); setScratchingSticker(null); fireEpicConfetti(); } }} 
-          onClose={() => setScratchingSticker(null)} 
-        />
+        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[5000] flex items-center justify-center p-4">
+           <div className="bg-white p-10 rounded-[4rem] w-full max-w-md border-[12px] border-indigo-950 shadow-2xl text-center space-y-8 animate-in zoom-in duration-300">
+              <div className="bg-yellow-400 w-24 h-24 rounded-full border-8 border-indigo-950 flex items-center justify-center mx-auto -rotate-12 shadow-xl">
+                 <Sparkles size={40} className="text-indigo-950" />
+              </div>
+              <h3 className="text-4xl font-black text-indigo-950 uppercase italic tracking-tighter">Figurinha Liberada!</h3>
+              <p className="text-indigo-400 font-black uppercase tracking-widest text-xs">Você ganhou a figurinha da Semana {scratchingSticker.week}!</p>
+              <button 
+                onClick={() => {
+                  onReveal(scratchingSticker.week);
+                  setCelebratingSticker({ week: scratchingSticker.week, data: scratchingSticker.data! });
+                  setScratchingSticker(null);
+                  fireEpicConfetti();
+                }}
+                className="w-full py-8 bg-indigo-600 text-white font-black rounded-[2.5rem] border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] text-2xl uppercase italic tracking-tighter active:translate-y-1 active:shadow-none transition-all"
+              >
+                RASPAR AGORA!
+              </button>
+           </div>
+        </div>
       )}
 
       {isAvatarPickerOpen && (
         <AvatarPickerModal 
-          onSelect={(updates) => { onUpdateProfile?.(updates); setIsAvatarPickerOpen(false); fireEpicConfetti(); }}
-          onClose={() => setIsAvatarPickerOpen(false)}
+          isOpen={isAvatarPickerOpen} 
+          onClose={() => setIsAvatarPickerOpen(false)} 
+          onSelect={(seed) => onUpdateProfile?.({ avatarSeed: seed, avatarUrl: '' })} 
         />
       )}
 
@@ -236,127 +251,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, onRevea
            </div>
         </div>
       )}
-    </div>
-  );
-};
-
-const ScratchCardModal: React.FC<{ sticker?: StickerType, onComplete: () => void, onClose: () => void }> = ({ sticker, onComplete, onClose }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [percent, setPercent] = useState(0);
-  const isDrawing = useRef(false);
-  const lastPos = useRef<{ x: number, y: number } | null>(null);
-
-  const CANVAS_WIDTH = 340;
-  const CANVAS_HEIGHT = 450;
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return;
-    
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
-
-    // TEXTURA DE FARELINHOS ORIGINAIS (METÁLICA)
-    ctx.fillStyle = '#adb5bd'; 
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-    // 2. Gerar "Farelinhos" massivos (Aumentado para 80.000 conforme pedido)
-    for (let i = 0; i < 80000; i++) {
-        const x = Math.random() * CANVAS_WIDTH;
-        const y = Math.random() * CANVAS_HEIGHT;
-        const rand = Math.random();
-        if (rand > 0.9) ctx.fillStyle = '#f8f9fa';
-        else if (rand > 0.7) ctx.fillStyle = '#ced4da';
-        else if (rand > 0.3) ctx.fillStyle = '#6c757d';
-        else ctx.fillStyle = '#343a40';
-        
-        ctx.fillRect(x, y, 1.2, 1.2);
-    }
-
-    // 3. Texto guia cinza MAIS ESCURO conforme pedido
-    ctx.font = '900 60px Fredoka';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; // Cinza mais escuro
-    ctx.textAlign = 'center';
-    ctx.fillText('RASPE AQUI', CANVAS_WIDTH/2, CANVAS_HEIGHT/2 + 20);
-
-    const getPos = (e: any) => {
-      const rect = canvas.getBoundingClientRect();
-      const cx = e.touches ? e.touches[0].clientX : e.clientX;
-      const cy = e.touches ? e.touches[0].clientY : e.clientY;
-      const x = (cx - rect.left) * (CANVAS_WIDTH / rect.width);
-      const y = (cy - rect.top) * (CANVAS_HEIGHT / rect.height);
-      return { x, y };
-    };
-
-    const calculateProgress = () => {
-      const imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT).data;
-      let emptyPixels = 0;
-      for (let i = 3; i < imageData.length; i += 40) {
-        if (imageData[i] < 10) emptyPixels++;
-      }
-      const p = (emptyPixels / (imageData.length / 40)) * 100;
-      setPercent(p);
-      // Mantido 90% conforme pedido
-      if (p >= 90) onComplete();
-    };
-
-    const scratch = (e: any) => {
-      if (!isDrawing.current) return;
-      if (e.cancelable) e.preventDefault();
-      const pos = getPos(e);
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = 55;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      if (lastPos.current) {
-        ctx.moveTo(lastPos.current.x, lastPos.current.y);
-        ctx.lineTo(pos.x, pos.y);
-      } else {
-        ctx.moveTo(pos.x, pos.y);
-      }
-      ctx.stroke();
-      lastPos.current = pos;
-      calculateProgress();
-    };
-
-    const startDrawing = (e: any) => { isDrawing.current = true; lastPos.current = getPos(e); scratch(e); };
-    const stopDrawing = () => { isDrawing.current = false; lastPos.current = null; };
-
-    canvas.addEventListener('mousedown', startDrawing);
-    canvas.addEventListener('mousemove', scratch);
-    window.addEventListener('mouseup', stopDrawing);
-    canvas.addEventListener('touchstart', startDrawing, { passive: false });
-    canvas.addEventListener('touchmove', scratch, { passive: false });
-    canvas.addEventListener('touchend', stopDrawing);
-
-    return () => {
-      canvas.removeEventListener('mousedown', startDrawing);
-      canvas.removeEventListener('mousemove', scratch);
-      window.removeEventListener('mouseup', stopDrawing);
-      canvas.removeEventListener('touchstart', startDrawing);
-      canvas.removeEventListener('touchmove', scratch);
-      canvas.removeEventListener('touchend', stopDrawing);
-    };
-  }, [onComplete]);
-
-  return (
-    <div className="fixed inset-0 bg-indigo-950/98 backdrop-blur-3xl z-[4000] flex flex-col items-center justify-center p-6 overflow-hidden">
-       <div className="text-center mb-8"><h3 className="text-5xl font-black text-yellow-400 italic uppercase tracking-tighter">RASPE JÁ!</h3></div>
-       <div ref={containerRef} className="relative w-full max-w-[340px] aspect-[3/4] rounded-[3rem] overflow-hidden bg-white shadow-2xl border-[10px] border-indigo-950 touch-none">
-          <div className="absolute inset-0 flex items-center justify-center p-0 bg-slate-50">
-             <img src={sticker?.imageUrl} className="w-full h-full object-cover opacity-20" />
-          </div>
-          <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full z-10 cursor-crosshair touch-none" />
-       </div>
-       <div className="mt-10 w-full max-w-[340px] space-y-6">
-          <div className="w-full h-6 bg-indigo-900 rounded-full p-1 border-2 border-indigo-800">
-             <div className="h-full bg-cyan-400 rounded-full transition-all" style={{ width: `${Math.min(100, (percent / 90) * 100)}%` }} />
-          </div>
-          <button onClick={onClose} className="w-full py-4 text-white/50 font-black uppercase text-xs">Cancelar</button>
-       </div>
     </div>
   );
 };

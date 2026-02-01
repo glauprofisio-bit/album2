@@ -42,12 +42,14 @@ export default async function handler(req, res) {
         id: s.id,
         week: s.week,
         name: s.name,
-        imageUrl: s.image_url
+        imageUrl: s.image_url,
+        rarity: s.rarity // Campo de raridade adicionado
       })) : Array.from({ length: 45 }, (_, i) => ({
         id: `sticker-${i + 1}`,
         week: i + 1,
         name: i + 1 >= 42 ? `Elo Supremo - Parte ${i - 40}` : `Semana ${i + 1}`,
-        imageUrl: ''
+        imageUrl: '',
+        rarity: 'NORMAL'
       })),
       studentStickers: (studentStickers || []).map(ss => ({
         alunoId: students.find(s => s.id === ss.student_id)?.id || ss.student_id,

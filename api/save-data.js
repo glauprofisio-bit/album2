@@ -16,8 +16,6 @@ export default async function handler(req, res) {
       const validProfs = professors.filter(p => p.id !== 'admin');
       const profLogins = validProfs.map(p => p.login);
       
-      // Deletar professores que não estão mais na lista (excluídos no app)
-      // Mantemos a 'Tati' como proteção se ela estiver na lista original
       if (profLogins.length > 0) {
         await supabase.from('professors').delete().not('login', 'in', `(${profLogins.map(l => `"${l}"`).join(',')})`).neq('login', 'Tati');
       } else {
@@ -46,7 +44,6 @@ export default async function handler(req, res) {
         await supabase.from('students').delete();
       }
 
-      // Buscar todos os professores para mapear IDs
       const { data: dbProfs } = await supabase.from('professors').select('id, login');
 
       for (const student of students) {
@@ -66,13 +63,14 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3. Sincronizar Figurinhas (Stickers)
+    // 3. Sincronizar Figurinhas (Stickers) - INCLUINDO RARIDADE
     if (stickers) {
       for (const s of stickers) {
         await supabase.from('stickers').upsert({
           week: s.week,
           name: s.name,
-          image_url: s.imageUrl
+          image_url: s.imageUrl,
+          rarity: s.rarity // Campo de raridade adicionado
         }, { onConflict: 'week' });
       }
     }
@@ -82,8 +80,6 @@ export default async function handler(req, res) {
       const { data: dbStudents } = await supabase.from('students').select('id, login');
       const { data: dbStickers } = await supabase.from('stickers').select('id, week');
 
-      // Para simplificar e garantir consistência, limpamos e reinserimos as relações de figurinhas
-      // Isso evita que figurinhas "desmarcadas" continuem no banco
       const studentIds = dbStudents?.map(s => s.id) || [];
       if (studentIds.length > 0) {
         await supabase.from('student_stickers').delete().in('student_id', studentIds);
