@@ -18,24 +18,38 @@ export default async function handler(req, res) {
     const { data: students, error: eStud } = await supabase.from('students').select('*');
     if (eStud) throw new Error(`students: ${eStud.message}`);
 
-    const { data: stickers, error: eStk } = await supabase
+    const { data: stickersRows, error: eStk } = await supabase
       .from('stickers')
       .select('*')
       .order('week', { ascending: true });
     if (eStk) throw new Error(`stickers: ${eStk.message}`);
 
-    const { data: studentStickers, error: eSS } = await supabase.from('student_stickers').select('*');
+    const { data: studentStickersRows, error: eSS } = await supabase.from('student_stickers').select('*');
     if (eSS) throw new Error(`student_stickers: ${eSS.message}`);
 
-    // semana global
     const { data: settings, error: eSet } = await supabase
       .from('app_settings')
       .select('current_week')
       .eq('id', 'global')
       .single();
 
-    // se não existir ainda, não quebra: assume semana 1
     const currentWeek = eSet ? 1 : (settings?.current_week || 1);
+
+    const stickersMap = new Map();
+    (stickersRows || []).forEach(s => stickersMap.set(s.week, s));
+
+    const stickers = Array.from({ length: 45 }, (_, i) => {
+      const week = i + 1;
+      const row = stickersMap.get(week);
+
+      return {
+        id: `sticker-${week}`,
+        week,
+        name: row?.name || (week >= 42 ? `Elo Supremo - Parte ${week - 40}` : `Semana ${week}`),
+        imageUrl: row?.image_url || '',
+        rarity: row?.rarity || 'NORMAL'
+      };
+    });
 
     const appData = {
       professors: (profs || []).map(p => ({
@@ -45,7 +59,7 @@ export default async function handler(req, res) {
         password: p.password,
         role: 'PROFESSOR',
         avatarUrl: p.avatar_url,
-        avatarSeed: p.avatar_seed,
+        avatarSeed: p.avatar_seed
       })),
       students: (students || []).map(s => ({
         id: s.id,
@@ -57,32 +71,18 @@ export default async function handler(req, res) {
         avatarUrl: s.avatar_url,
         avatarSeed: s.avatar_seed,
         serie: s.serie,
-        ciclo: s.ciclo,
+        ciclo: s.ciclo
       })),
-      stickers: stickers && stickers.length > 0
-        ? stickers.map(s => ({
-            id: `sticker-${s.week}`,
-            week: s.week,
-            name: s.name,
-            imageUrl: s.image_url,
-            rarity: s.rarity,
-          }))
-        : Array.from({ length: 45 }, (_, i) => ({
-            id: `sticker-${i + 1}`,
-            week: i + 1,
-            name: i + 1 >= 42 ? `Elo Supremo - Parte ${i - 40}` : `Semana ${i + 1}`,
-            imageUrl: '',
-            rarity: 'NORMAL',
-          })),
-      studentStickers: (studentStickers || []).map(ss => ({
+      stickers,
+      studentStickers: (studentStickersRows || []).map(ss => ({
         alunoId: ss.student_id,
         week: ss.week,
         liberada: ss.liberada,
         revelada: ss.revelada,
         isFalta: ss.is_falta,
-        reconquistada: ss.reconquistada,
+        reconquistada: ss.reconquistada
       })),
-      currentWeek,
+      currentWeek
     };
 
     return res.status(200).json(appData);
