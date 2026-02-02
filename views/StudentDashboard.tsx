@@ -46,14 +46,20 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
 
   // Imparáveis: sequência atual (terminando na semana atual) >= 4
   const currentStreak = useMemo(() => {
-    let streak = 0;
-    for (let w = data.currentWeek; w >= 1; w--) {
-      const s = myStickers.find(st => st.week === w);
-      if (s && s.liberada && !s.isFalta) streak++;
-      else break;
-    }
-    return streak;
-  }, [data.currentWeek, myStickers]);
+  let startWeek = data.currentWeek;
+  const hasWeek = (w: number) => myStickers.some(st => st.week === w);
+
+  if (!hasWeek(startWeek)) startWeek = startWeek - 1;
+  if (startWeek < 1) return 0;
+
+  let streak = 0;
+  for (let w = startWeek; w >= 1; w--) {
+    const s = myStickers.find(st => st.week === w);
+    if (s && s.liberada && !s.isFalta) streak++;
+    else break;
+  }
+  return streak;
+}, [data.currentWeek, myStickers]);
 
   const isUnstoppable = currentStreak >= 4;
 
