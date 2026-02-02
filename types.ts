@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = 'ADMIN',
   PROFESSOR = 'PROFESSOR',
@@ -14,18 +13,20 @@ export enum StickerRarity {
   DIAMOND = 'DIAMOND'
 }
 
+export type Ciclo = 'Anos Iniciais' | 'Anos Finais' | 'Ensino Médio';
+
 export interface User {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   login: string;
   password?: string;
-  role: UserRole;
-  professorId?: string; // Only for ALUNO
-  avatarSeed?: string; // Semente para o gerador de avatar (DiceBear)
-  avatarUrl?: string; // URL da imagem ou base64 da figurinha de perfil
-  serie?: string; // Ex: "1A", "9B"
-  ciclo?: 'Anos Iniciais' | 'Anos Finais' | 'Ensino Médio';
+  role: UserRole | 'ADMIN' | 'PROFESSOR' | 'ALUNO';
+  professorId?: string | null;
+  avatarUrl?: string;
+  avatarSeed?: string;
+  serie?: string;
+  ciclo?: Ciclo;
 }
 
 export interface Sticker {
@@ -33,7 +34,7 @@ export interface Sticker {
   week: number;
   name: string;
   imageUrl: string;
-  rarity?: StickerRarity; // Define o nível de raridade da figurinha
+  rarity: StickerRarity | 'NORMAL' | 'RUBY' | 'EMERALD' | 'OBSIDIAN' | 'GOLD' | 'DIAMOND';
 }
 
 export interface AlunoSticker {
@@ -42,7 +43,7 @@ export interface AlunoSticker {
   liberada: boolean;
   revelada: boolean;
   reconquistada: boolean;
-  isFalta?: boolean; // Indica se o aluno faltou e perdeu a figurinha
+  isFalta: boolean;
   date?: string;
 }
 
