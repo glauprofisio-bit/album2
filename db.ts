@@ -1,40 +1,43 @@
-// src/db.ts
-import { AppData } from './types';
+import type { AppData } from './types';
 
 export const initialData: AppData = {
   professors: [],
   students: [],
-  stickers: [],
+  stickers: Array.from({ length: 45 }, (_, i) => {
+    const week = i + 1;
+    return {
+      id: `sticker-${week}`,
+      week,
+      name: week >= 42 ? `Elo Supremo - Parte ${week - 40}` : `Semana ${week}`,
+      imageUrl: '',
+      rarity: 'NORMAL'
+    };
+  }),
   studentStickers: [],
   currentWeek: 1
 };
 
-export const loadData = () => initialData;
-
-// Puxa tudo do backend
-export const syncWithCloud = async (): Promise<AppData | null> => {
+export async function syncWithCloud(): Promise<AppData | null> {
   try {
     const res = await fetch('/api/load-data', { method: 'GET' });
     if (!res.ok) return null;
-    return await res.json();
-  } catch {
+    const data = await res.json();
+    return data as AppData;
+  } catch (e) {
+    console.error('syncWithCloud error:', e);
     return null;
   }
-};
+}
 
-// Salva tudo no backend
-export const saveData = async (data: AppData) => {
+export async function saveData(appData: AppData): Promise<void> {
   const res = await fetch('/api/save-data', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
+    body: JSON.stringify(appData)
   });
 
   if (!res.ok) {
-    const msg = await res.text().catch(() => '');
-    throw new Error(msg || 'Falha ao salvar');
+    const txt = await res.text().catch(() => '');
+    throw new Error(`saveData failed: ${res.status} ${txt}`);
   }
-};
-
-// Mantido só pra não quebrar imports antigos
-export const deleteFromCloud = async () => {};
+}
