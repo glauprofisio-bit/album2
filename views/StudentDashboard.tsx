@@ -1,6 +1,7 @@
+// src/views/StudentDashboard.tsx
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { AppData, User, AlunoSticker, Sticker as StickerType, StickerRarity } from '../types';
-import { Lock, X, Star, Trophy, Sparkles, UserCircle, Puzzle } from 'lucide-react';
+import { Lock, X, Star, Trophy, Sparkles, UserCircle, Puzzle, Flame } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import AvatarPickerModal from './AvatarPickerModal';
 
@@ -19,10 +20,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
   const [celebratingSticker, setCelebratingSticker] = useState<{ week: number; data: StickerType } | null>(null);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
 
-  const myStickers = useMemo(
-    () => data.studentStickers.filter(s => s.alunoId === user.id),
-    [data.studentStickers, user.id]
-  );
+  const myStickers = useMemo(() => data.studentStickers.filter(s => s.alunoId === user.id), [data.studentStickers, user.id]);
 
   const stats = useMemo(() => {
     const totalReveladas = myStickers.filter(s => s.revelada).length;
@@ -32,6 +30,19 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
       percent: (totalReveladas / 45) * 100
     };
   }, [myStickers]);
+
+  // ✅ streak ATUAL (precisa ser consecutivo até a semana atual, senão perde)
+  const currentStreak = useMemo(() => {
+    let streak = 0;
+    for (let w = data.currentWeek; w >= 1; w--) {
+      const s = myStickers.find(st => st.week === w);
+      if (s && s.liberada && !s.isFalta) streak++;
+      else break;
+    }
+    return streak;
+  }, [myStickers, data.currentWeek]);
+
+  const isUnstoppable = currentStreak >= 4;
 
   const allComboRevealed = useMemo(
     () => [42, 43, 44, 45].every(w => myStickers.find(s => s.week === w)?.revelada),
@@ -64,57 +75,17 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
   const fireEpicConfetti = () => {
     const duration = 3000;
     const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 40, spread: 360, ticks: 110, zIndex: 10000 };
+    const defaults = { startVelocity: 40, spread: 360, ticks: 100, zIndex: 10000 };
     const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
     const interval: any = setInterval(() => {
       const timeLeft = animationEnd - Date.now();
       if (timeLeft <= 0) return clearInterval(interval);
-      const particleCount = 70 * (timeLeft / duration);
+      const particleCount = 60 * (timeLeft / duration);
 
       confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
       confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
     }, 220);
-  };
-
-  const playUnlockSound = () => {
-    try {
-      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-
-      const ctx = new AudioCtx();
-      const now = ctx.currentTime;
-
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(0.0001, now);
-      master.gain.exponentialRampToValueAtTime(0.25, now + 0.02);
-      master.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
-      master.connect(ctx.destination);
-
-      const osc1 = ctx.createOscillator();
-      osc1.type = 'triangle';
-      osc1.frequency.setValueAtTime(880, now);
-      osc1.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
-
-      const osc2 = ctx.createOscillator();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(660, now);
-      osc2.frequency.exponentialRampToValueAtTime(990, now + 0.12);
-
-      osc1.connect(master);
-      osc2.connect(master);
-      osc1.start(now);
-      osc2.start(now);
-
-      osc1.stop(now + 0.5);
-      osc2.stop(now + 0.5);
-
-      setTimeout(() => {
-        try { ctx.close(); } catch {}
-      }, 700);
-    } catch {
-      // sem som se o browser bloquear
-    }
   };
 
   const setRevealedAndPersist = useCallback(
@@ -139,292 +110,114 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
     onClose: () => void;
     onDone: () => void;
   }> = ({ week, sticker, onClose, onDone }) => {
-    const coverCanvasRef = useRef<HTMLCanvasElement | null>(null);
-    const crumbsCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const wrapRef = useRef<HTMLDivElement | null>(null);
-
     const isDownRef = useRef(false);
     const doneRef = useRef(false);
     const lastCheckRef = useRef(0);
-    const lastPosRef = useRef<{ x: number; y: number } | null>(null);
 
-    const rafRef = useRef<number | null>(null);
-    const crumbsRef = useRef<Array<{ x: number; y: number; vx: number; vy: number; life: number; size: number; rot: number; vr: number }>>([]);
-
-    const getDpr = () => Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-
-    const resizeAndRedraw = useCallback(() => {
+    const drawTexture = useCallback(() => {
+      const canvas = canvasRef.current;
       const wrap = wrapRef.current;
-      const cover = coverCanvasRef.current;
-      const crumbs = crumbsCanvasRef.current;
-      if (!wrap || !cover || !crumbs) return;
+      if (!canvas || !wrap) return;
 
       const rect = wrap.getBoundingClientRect();
-      const dpr = getDpr();
+      canvas.width = Math.floor(rect.width);
+      canvas.height = Math.floor(rect.height);
 
-      // Cover
-      cover.width = Math.floor(rect.width * dpr);
-      cover.height = Math.floor(rect.height * dpr);
-      cover.style.width = `${rect.width}px`;
-      cover.style.height = `${rect.height}px`;
-
-      // Crumbs
-      crumbs.width = Math.floor(rect.width * dpr);
-      crumbs.height = Math.floor(rect.height * dpr);
-      crumbs.style.width = `${rect.width}px`;
-      crumbs.style.height = `${rect.height}px`;
-
-      const ctx = cover.getContext('2d');
+      const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      // textura “raspadinha”
-      const w = rect.width;
-      const h = rect.height;
-
-      // base metálica
-      const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, '#c7ccd3');
-      g.addColorStop(0.35, '#aab1bb');
-      g.addColorStop(0.65, '#c8cfd8');
-      g.addColorStop(1, '#9aa3ad');
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#9CA3AF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // linhas diagonais bem leves (efeito foil)
-      ctx.save();
-      ctx.globalAlpha = 0.18;
-      ctx.translate(w / 2, h / 2);
-      ctx.rotate(-0.22);
-      ctx.translate(-w / 2, -h / 2);
-      for (let y = -h; y < h * 2; y += 10) {
-        ctx.fillStyle = y % 20 === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.10)';
-        ctx.fillRect(-w, y, w * 3, 2);
-      }
-      ctx.restore();
-
-      // “grão”/pontos
-      const dots = Math.floor((w * h) / 420);
-      for (let i = 0; i < dots; i++) {
-        const x = Math.random() * w;
-        const y = Math.random() * h;
-        const r = Math.random() * 1.5;
-        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)';
+      for (let i = 0; i < 1800; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const r = Math.random() * 1.6;
+        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // brilho central (faixa)
-      const shine = ctx.createRadialGradient(w * 0.35, h * 0.25, 10, w * 0.5, h * 0.5, Math.max(w, h) * 0.9);
-      shine.addColorStop(0, 'rgba(255,255,255,0.18)');
-      shine.addColorStop(0.35, 'rgba(255,255,255,0.06)');
-      shine.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = shine;
-      ctx.fillRect(0, 0, w, h);
-
-      // texto proporcional ao card
-      const fontSize = Math.max(18, Math.min(w, h) * 0.095);
       ctx.save();
-      ctx.globalAlpha = 0.32;
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.font = '900 28px Fredoka, system-ui, -apple-system, Segoe UI, Roboto, Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `900 ${fontSize}px Fredoka, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-      ctx.translate(w / 2, h / 2);
-      ctx.rotate(-0.10);
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(-0.12);
       ctx.fillText('RASPE AQUI', 0, 0);
       ctx.restore();
-
-      doneRef.current = false;
-      lastPosRef.current = null;
-      crumbsRef.current = [];
-      const cctx = crumbs.getContext('2d');
-      if (cctx) {
-        cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        cctx.clearRect(0, 0, w, h);
-      }
     }, []);
 
     useEffect(() => {
-      resizeAndRedraw();
-      const onResize = () => resizeAndRedraw();
+      drawTexture();
+      const onResize = () => drawTexture();
       window.addEventListener('resize', onResize);
       return () => window.removeEventListener('resize', onResize);
-    }, [resizeAndRedraw]);
+    }, [drawTexture]);
 
-    const addCrumbs = (x: number, y: number) => {
-      // poucas partículas por evento pra não pesar
-      for (let i = 0; i < 10; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const sp = 0.6 + Math.random() * 1.6;
-        crumbsRef.current.push({
-          x: x + (Math.random() * 14 - 7),
-          y: y + (Math.random() * 14 - 7),
-          vx: Math.cos(a) * sp,
-          vy: Math.sin(a) * sp - 0.8,
-          life: 1,
-          size: 1 + Math.random() * 2.4,
-          rot: Math.random() * Math.PI,
-          vr: (Math.random() - 0.5) * 0.25
-        });
-      }
-    };
-
-    const tickCrumbs = () => {
-      const wrap = wrapRef.current;
-      const crumbs = crumbsCanvasRef.current;
-      if (!wrap || !crumbs) return;
-
-      const rect = wrap.getBoundingClientRect();
-      const cctx = crumbs.getContext('2d');
-      if (!cctx) return;
-
-      // já está em CSS pixels por causa do setTransform no resize
-      cctx.clearRect(0, 0, rect.width, rect.height);
-
-      const arr = crumbsRef.current;
-      for (let i = arr.length - 1; i >= 0; i--) {
-        const p = arr[i];
-        p.vy += 0.06; // gravidade leve
-        p.x += p.vx;
-        p.y += p.vy;
-        p.rot += p.vr;
-        p.life -= 0.02;
-
-        if (p.life <= 0) {
-          arr.splice(i, 1);
-          continue;
-        }
-
-        cctx.save();
-        cctx.globalAlpha = Math.max(0, p.life) * 0.9;
-        cctx.translate(p.x, p.y);
-        cctx.rotate(p.rot);
-        cctx.fillStyle = 'rgba(190, 190, 190, 0.95)';
-        cctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.7);
-        cctx.restore();
-      }
-
-      if (arr.length > 0) {
-        rafRef.current = requestAnimationFrame(tickCrumbs);
-      } else {
-        rafRef.current = null;
-      }
-    };
-
-    const ensureCrumbsLoop = () => {
-      if (rafRef.current != null) return;
-      rafRef.current = requestAnimationFrame(tickCrumbs);
-    };
-
-    const eraseStroke = (from: { x: number; y: number }, to: { x: number; y: number }) => {
-      const cover = coverCanvasRef.current;
-      const wrap = wrapRef.current;
-      if (!cover || !wrap) return;
-
-      const rect = wrap.getBoundingClientRect();
-      const ctx = cover.getContext('2d');
+    const eraseAt = (clientX: number, clientY: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // cover ctx está em CSS px (setTransform no resize)
-      const brush = Math.max(26, Math.min(rect.width, rect.height) * 0.055);
+      const rect = canvas.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
 
       ctx.save();
       ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = 'rgba(0,0,0,1)';
-      ctx.lineWidth = brush * 2;
-
       ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
-
-      // garante “limpeza” do final do traço
-      ctx.beginPath();
-      ctx.arc(to.x, to.y, brush, 0, Math.PI * 2);
+      ctx.arc(x, y, 24, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-
-      addCrumbs(to.x, to.y);
-      ensureCrumbsLoop();
     };
 
     const scratchedEnough = () => {
-      const cover = coverCanvasRef.current;
-      if (!cover) return false;
+      const canvas = canvasRef.current;
+      if (!canvas) return false;
 
-      // checagem leve: downscale e mede alpha (quanto foi apagado)
-      const w = 140;
-      const h = 190;
+      const w = 120;
+      const h = 160;
       const off = document.createElement('canvas');
       off.width = w;
       off.height = h;
       const octx = off.getContext('2d');
       if (!octx) return false;
 
-      octx.drawImage(cover, 0, 0, w, h);
+      octx.drawImage(canvas, 0, 0, w, h);
       const img = octx.getImageData(0, 0, w, h).data;
 
       let cleared = 0;
       const total = w * h;
       for (let i = 3; i < img.length; i += 4) {
-        if (img[i] < 40) cleared++; // alpha bem baixo = raspado
+        if (img[i] < 80) cleared++;
       }
       const percent = cleared / total;
-      return percent >= 0.9; // ~90% raspado pra liberar
-    };
-
-    const getLocalXY = (clientX: number, clientY: number) => {
-      const wrap = wrapRef.current;
-      if (!wrap) return { x: 0, y: 0 };
-      const rect = wrap.getBoundingClientRect();
-      return { x: clientX - rect.left, y: clientY - rect.top };
+      return percent >= 0.65;
     };
 
     const handleDown = (e: React.PointerEvent) => {
       if (doneRef.current) return;
       isDownRef.current = true;
       (e.target as any).setPointerCapture?.(e.pointerId);
-
-      const p = getLocalXY(e.clientX, e.clientY);
-      lastPosRef.current = p;
-      eraseStroke(p, p);
+      eraseAt(e.clientX, e.clientY);
     };
 
     const handleMove = (e: React.PointerEvent) => {
       if (!isDownRef.current || doneRef.current) return;
-
-      const p = getLocalXY(e.clientX, e.clientY);
-      const last = lastPosRef.current || p;
-      lastPosRef.current = p;
-      eraseStroke(last, p);
+      eraseAt(e.clientX, e.clientY);
 
       const now = Date.now();
-      if (now - lastCheckRef.current > 220) {
+      if (now - lastCheckRef.current > 250) {
         lastCheckRef.current = now;
         if (scratchedEnough()) {
           doneRef.current = true;
-
-          // limpa a camada inteira (fica 100% revelado)
-          const wrap = wrapRef.current;
-          const cover = coverCanvasRef.current;
-          if (wrap && cover) {
-            const rect = wrap.getBoundingClientRect();
-            const ctx = cover.getContext('2d');
-            if (ctx) {
-              ctx.save();
-              ctx.globalCompositeOperation = 'destination-out';
-              ctx.fillRect(0, 0, rect.width, rect.height);
-              ctx.restore();
-            }
-          }
-
-          playUnlockSound();
           onDone();
         }
       }
@@ -432,21 +225,17 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
 
     const handleUp = () => {
       isDownRef.current = false;
-      lastPosRef.current = null;
     };
 
     return (
       <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[5000] flex items-center justify-center p-4">
         <div className="bg-white rounded-[4rem] w-full max-w-md border-[12px] border-indigo-950 shadow-2xl overflow-hidden relative">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-3 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl z-10"
-          >
+          <button onClick={onClose} className="absolute top-4 right-4 p-3 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl z-10">
             <X size={22} strokeWidth={4} />
           </button>
 
           <div className="p-7 text-center">
-            <div className="bg-yellow-400 w-20 h-20 rounded-full border-8 border-indigo-950 flex items-center justify-center mx-auto -rotate-12 shadow-xl mb-4">
+            <div className="bg-yellow-400 w-20 h-20 rounded-full border-8 border-indigo-950 flex items-center justify-center mx-auto shadow-xl mb-4">
               <Sparkles size={34} className="text-indigo-950" />
             </div>
             <h3 className="text-3xl font-black text-indigo-950 uppercase italic tracking-tighter">Raspe a figurinha!</h3>
@@ -455,7 +244,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
 
           <div className="px-7 pb-8">
             <div ref={wrapRef} className="relative w-full aspect-[3/4] rounded-[2.5rem] overflow-hidden border-[10px] border-indigo-950 bg-white">
-              {/* abaixo: figurinha (o que aparece depois de raspar) */}
               <div className="absolute inset-0">
                 <div className={`w-full h-full flex flex-col border-4 ${getRarityStyle(sticker?.rarity).frame} rounded-[2rem] overflow-hidden`}>
                   <div className="flex-1 bg-slate-50 flex items-center justify-center">
@@ -474,9 +262,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
                 </div>
               </div>
 
-              {/* camada raspável */}
               <canvas
-                ref={coverCanvasRef}
+                ref={canvasRef}
                 className="absolute inset-0 w-full h-full"
                 style={{ touchAction: 'none' }}
                 onPointerDown={handleDown}
@@ -485,9 +272,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
                 onPointerCancel={handleUp}
                 onPointerLeave={handleUp}
               />
-
-              {/* migalhinhas (por cima do cover) */}
-              <canvas ref={crumbsCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
             </div>
 
             <p className="text-center mt-4 text-[10px] font-black uppercase tracking-widest text-indigo-300">
@@ -535,9 +319,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
             </div>
             {!isCombo && (
               <div className="p-1 text-center bg-white border-t border-slate-100">
-                <p className="text-[8px] font-black text-indigo-950 truncate uppercase tracking-tighter leading-none">
-                  {stickerData?.name || `S${w}`}
-                </p>
+                <p className="text-[8px] font-black text-indigo-950 truncate uppercase tracking-tighter leading-none">{stickerData?.name || `S${w}`}</p>
               </div>
             )}
             {isCombo && !isAllComboDone && (
@@ -547,19 +329,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
             )}
           </div>
         ) : isLiberada ? (
-          <div
-            className={`w-full h-full ${isCombo ? 'bg-indigo-500' : 'bg-slate-400'} flex flex-col items-center justify-center p-2 relative overflow-hidden shadow-inner ${
-              puzzleClasses || 'rounded-[1.5rem]'
-            }`}
-          >
+          <div className={`w-full h-full ${isCombo ? 'bg-indigo-500' : 'bg-slate-400'} flex flex-col items-center justify-center p-2 relative overflow-hidden shadow-inner ${puzzleClasses || 'rounded-[1.5rem]'}`}>
             <div className="absolute inset-0 opacity-40 bg-slate-500/20"></div>
             <div className="relative z-10 flex flex-col items-center gap-1">
               <div className="bg-yellow-400 p-1.5 rounded-lg border-2 border-indigo-950 shadow-md rotate-3">
                 <Sparkles size={16} className="text-indigo-950" />
               </div>
-              <h4 className="text-[12px] font-black text-white uppercase italic leading-none tracking-tighter -rotate-6 text-center drop-shadow-md">
-                RASPE!
-              </h4>
+              <h4 className="text-[12px] font-black text-white uppercase italic leading-none tracking-tighter text-center drop-shadow-md">RASPE!</h4>
             </div>
           </div>
         ) : isLost ? (
@@ -582,7 +358,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
     <div className="space-y-8 pb-12 animate-in fade-in duration-500">
       <div className="bg-white rounded-[3rem] p-8 md:p-10 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] flex flex-col md:flex-row items-center gap-8 md:gap-12">
         <div onClick={() => setIsAvatarPickerOpen(true)} className="relative group cursor-pointer">
-          <div className="w-32 h-32 md:w-40 md:h-40 bg-slate-100 rounded-full border-[6px] border-indigo-950 shadow-xl overflow-hidden relative transition-transform group-hover:scale-105 active:scale-95">
+          <div
+            className={`w-32 h-32 md:w-40 md:h-40 bg-slate-100 rounded-full border-[6px] shadow-xl overflow-hidden relative transition-transform group-hover:scale-105 active:scale-95 ${
+              isUnstoppable ? 'border-orange-500' : 'border-indigo-950'
+            }`}
+          >
             {avatarDisplayUrl ? (
               <img src={avatarDisplayUrl} className="w-full h-full object-cover" />
             ) : (
@@ -590,14 +370,33 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
                 <UserCircle size={64} />
               </div>
             )}
+
+            {isUnstoppable && (
+              <div className="absolute -bottom-1 -right-1 bg-orange-500 p-2 rounded-2xl border-4 border-indigo-950 shadow-lg">
+                <Flame size={18} className="text-white" fill="currentColor" />
+              </div>
+            )}
           </div>
-          <div className="absolute -bottom-2 -right-2 bg-yellow-400 p-3 rounded-2xl border-4 border-indigo-950 shadow-lg -rotate-12 group-hover:rotate-0 transition-all">
-            <Star size={20} className="text-indigo-950" fill="currentColor" />
-          </div>
+
+          {!isUnstoppable && (
+            <div className="absolute -bottom-2 -right-2 bg-yellow-400 p-3 rounded-2xl border-4 border-indigo-950 shadow-lg group-hover:rotate-0 transition-all">
+              <Star size={20} className="text-indigo-950" fill="currentColor" />
+            </div>
+          )}
         </div>
 
         <div className="flex-1 space-y-6 text-center md:text-left w-full">
-          <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter leading-none text-indigo-950">{user.name}</h2>
+          <div className="space-y-2">
+            <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter leading-none text-indigo-950">{user.name}</h2>
+
+            {isUnstoppable && (
+              <div className="inline-flex items-center gap-2 bg-orange-100 px-5 py-2 rounded-full border-2 border-orange-200">
+                <Flame size={16} className="text-orange-600" fill="currentColor" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-orange-700">IMPARÁVEL: {currentStreak} semanas seguidas</span>
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-wrap justify-center md:justify-start gap-3 md:gap-4">
             <div className="flex items-center gap-3 bg-yellow-400 px-5 py-3 rounded-[1.5rem] text-[10px] md:text-[12px] font-black uppercase tracking-widest text-indigo-950 border-4 border-indigo-950 shadow-[0_4px_0_0_rgba(30,27,75,1)]">
               <Trophy size={18} /> {stats.revealed}/45 FIGURINHAS
@@ -608,10 +407,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
           </div>
 
           <div className="w-full bg-slate-100 h-6 rounded-full border-4 border-indigo-950 p-1 overflow-hidden">
-            <div
-              className="bg-gradient-to-r from-green-400 to-emerald-500 h-full rounded-full transition-all duration-1000 shadow-inner"
-              style={{ width: `${stats.percent}%` }}
-            />
+            <div className="bg-gradient-to-r from-green-400 to-emerald-500 h-full rounded-full transition-all duration-1000 shadow-inner" style={{ width: `${stats.percent}%` }} />
           </div>
         </div>
       </div>
@@ -637,26 +433,21 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
         </div>
       </div>
 
-      {/* modal raspadinha real */}
       {scratchingSticker && (
         <ScratchModal
           week={scratchingSticker.week}
           sticker={scratchingSticker.data}
           onClose={() => setScratchingSticker(null)}
           onDone={() => {
-            const wk = scratchingSticker.week;
-            const dt = scratchingSticker.data;
             setScratchingSticker(null);
-
-            if (dt) {
-              setCelebratingSticker({ week: wk, data: dt });
+            if (scratchingSticker.data) {
+              setCelebratingSticker({ week: scratchingSticker.week, data: scratchingSticker.data });
               fireEpicConfetti();
             }
           }}
         />
       )}
 
-      {/* celebração e “colar no álbum” */}
       {celebratingSticker && (
         <div className="fixed inset-0 bg-indigo-950/98 backdrop-blur-3xl z-[5000] flex flex-col items-center justify-center p-6 animate-in fade-in duration-700">
           <div className="relative mb-12 flex flex-col items-center">
@@ -687,7 +478,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
         </div>
       )}
 
-      {/* avatar picker */}
       {isAvatarPickerOpen && (
         <AvatarPickerModal
           onClose={() => setIsAvatarPickerOpen(false)}
@@ -698,7 +488,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
         />
       )}
 
-      {/* modal detalhe */}
       {selectedSticker && !celebratingSticker && (
         <div className="fixed inset-0 bg-indigo-950/90 backdrop-blur-xl z-[2000] flex items-center justify-center p-6" onClick={() => setSelectedSticker(null)}>
           <div className="bg-white rounded-[4rem] w-full max-w-sm p-10 shadow-2xl relative border-[8px] border-indigo-950 animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
@@ -718,8 +507,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
                 <h3 className="text-3xl font-black text-red-500 uppercase italic tracking-tighter mb-6">BLOQUEADA!</h3>
                 <p className="text-[13px] font-black text-indigo-950 uppercase leading-relaxed mb-8 px-2">
                   {selectedSticker.week >= 42
-                    ? "Esta é uma peça do ELO SUPREMO. Você só ganha se sua família for na reunião de pais!"
-                    : "Você perdeu a figurinha. Tire uma nota 10 em qualquer matéria ou conquiste 4 figurinhas seguidas para reconquistar 1 figurinha perdida"}
+                    ? 'Esta é uma peça do ELO SUPREMO. Você só ganha se sua família for na reunião de pais!'
+                    : 'Você perdeu a figurinha. Tire uma nota 10 em qualquer matéria ou conquiste 4 figurinhas seguidas para reconquistar 1 figurinha perdida'}
                 </p>
                 <Lock size={64} className="mx-auto text-indigo-100 mb-2" />
               </div>
