@@ -9,20 +9,31 @@ import StudentDashboard from './views/StudentDashboard';
 import HallOfFame from './views/HallOfFame';
 import { LogOut, Trophy, LayoutDashboard, RefreshCw } from 'lucide-react';
 
+type SessionUser = Pick<User, 'id' | 'login' | 'name'> & { role: UserRole };
+
 const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [data, setData] = useState<AppData>(initialData);
+  const dataRef = useRef<AppData>(initialData);
+
   const [currentView, setCurrentView] = useState<'dashboard' | 'ranking'>('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const isBusyRef = useRef(false);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   const performSync = useCallback(async (showLoader = false) => {
     if (isBusyRef.current) return;
     if (showLoader) setIsSyncing(true);
     try {
       const cloudData = await syncWithCloud();
-      if (cloudData) setData(cloudData);
+      if (cloudData) {
+        setData(cloudData);
+        dataRef.current = cloudData;
+      }
     } catch (error) {
       console.error('Erro na sincronização:', error);
     } finally {
@@ -36,12 +47,15 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [performSync]);
 
-  const updateData = async (newData: Partial<AppData>) => {
+  const updateData = useCallback(async (newData: Partial<AppData>) => {
+    if (isBusyRef.current) return;
+
     isBusyRef.current = true;
     setIsSaving(true);
 
-    const updatedData = { ...data, ...newData };
+    const updatedData = { ...dataRef.current, ...newData };
     setData(updatedData);
+    dataRef.current = updatedData;
 
     try {
       await saveData(updatedData);
@@ -51,47 +65,76 @@ const App: React.FC = () => {
       setTimeout(() => {
         isBusyRef.current = false;
         setIsSaving(false);
-      }, 500);
+      }, 350);
     }
-  };
+  }, []);
 
-  const currentUser = useMemo(() => {
+  const currentUser = useMemo<User | null>(() => {
     if (!user) return null;
-    if (user.id === 'admin') return { ...user, role: UserRole.ADMIN };
 
-    const p = data.professors.find(p => p.login === user.login);
-    if (p) return { ...p, role: UserRole.PROFESSOR };
+    if (user.id === 'admin') {
+      return { ...user, email: 'admin@escola.com', password: '', role: UserRole.ADMIN } as any;
+    }
 
-    const s = data.students.find(s => s.login === user.login);
-    if (s) return { ...s, role: UserRole.ALUNO };
+    const d = dataRef.current;
 
-    return user;
-  }, [user, data]);
+    if (user.role === UserRole.PROFESSOR) {
+      const prof = d.professors.find(p => p.id === user.id);
+      if (prof) return { ...prof, role: UserRole.PROFESSOR } as any;
+    }
 
-  const getAvatarUrl = (u: User) => u.avatarUrl || (u.avatarSeed ? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}` : null);
+    if (user.role === UserRole.ALUNO) {
+      const student = d.students.find(s => s.id === user.id);
+      if (student) return { ...student, role: UserRole.ALUNO } as any;
+    }
+
+    // fallback (só pra não te deixar travada se algum dado vier estranho)
+    const p = d.professors.find(p => p.login === user.login);
+    if (p) return { ...p, role: UserRole.PROFESSOR } as any;
+
+    const s = d.students.find(s => s.login === user.login);
+    if (s) return { ...s, role: UserRole.ALUNO } as any;
+
+    return user as any;
+  }, [user]);
+
+  const getAvatarUrl = (u: User) =>
+    u.avatarUrl || (u.avatarSeed ? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}` : null);
 
   const updateCurrentProfile = async (updates: Partial<User>) => {
     if (!currentUser) return;
 
     if (currentUser.role === UserRole.PROFESSOR) {
-      const nextProfs = data.professors.map(p => p.id === currentUser.id ? { ...p, ...updates } : p);
+      const nextProfs = dataRef.current.professors.map(p => (p.id === currentUser.id ? { ...p, ...updates } : p));
       await updateData({ professors: nextProfs });
-      setUser({ ...currentUser, ...updates });
+      setUser(prev => (prev ? { ...prev, ...updates } : prev) as any);
       return;
     }
 
     if (currentUser.role === UserRole.ALUNO) {
-      const nextStudents = data.students.map(s => s.id === currentUser.id ? { ...s, ...updates } : s);
+      const nextStudents = dataRef.current.students.map(s => (s.id === currentUser.id ? { ...s, ...updates } : s));
       await updateData({ students: nextStudents });
-      setUser({ ...currentUser, ...updates });
+      setUser(prev => (prev ? { ...prev, ...updates } : prev) as any);
       return;
     }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setCurrentView('dashboard');
   };
 
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
       {!currentUser ? (
-        <Login onLogin={setUser} appData={data} />
+        <Login
+          onLogin={(u) => {
+            // fixa a sessão por ID + role (isso é o que mata o bug de trocar sozinho)
+            setUser({ id: u.id, login: u.login, name: u.name, role: u.role });
+            setCurrentView('dashboard');
+          }}
+          appData={data}
+        />
       ) : (
         <>
           <header className="p-4 sticky top-0 z-50">
@@ -117,7 +160,7 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <button onClick={() => setUser(null)} className="bg-red-500 p-2 rounded-xl border-4 border-indigo-950 text-white">
+              <button onClick={handleLogout} className="bg-red-500 p-2 rounded-xl border-4 border-indigo-950 text-white">
                 <LogOut size={20} />
               </button>
             </div>
