@@ -117,55 +117,76 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
     const isDownRef = useRef(false);
     const doneRef = useRef(false);
     const lastCheckRef = useRef(0);
+    const dprRef = useRef<number>(1);
+    const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
-    const drawTexture = useCallback(() => {
+    const resizeCanvasToDpr = useCallback(() => {
       const canvas = canvasRef.current;
       const wrap = wrapRef.current;
       if (!canvas || !wrap) return;
 
       const rect = wrap.getBoundingClientRect();
-      canvas.width = Math.max(1, Math.floor(rect.width));
-      canvas.height = Math.max(1, Math.floor(rect.height));
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      dprRef.current = dpr;
+
+      const cssW = Math.max(1, rect.width);
+      const cssH = Math.max(1, rect.height);
+
+      canvas.width = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
+      // desenhar em coordenadas "CSS", mas com canvas em DPR
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { cssW, cssH, ctx };
+    }, []);
+
+    const drawTexture = useCallback(() => {
+      const res = resizeCanvasToDpr();
+      if (!res) return;
+
+      const { cssW, cssH, ctx } = res;
+
       // base totalmente opaca (não vaza fundo)
       ctx.globalCompositeOperation = 'source-over';
+      ctx.clearRect(0, 0, cssW, cssH);
       ctx.fillStyle = '#9CA3AF';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, cssW, cssH);
 
-      // textura/grão
-      for (let i = 0; i < 2200; i++) {
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        const r = Math.random() * 1.8;
-        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+      // textura/grão (escala com área)
+      const dots = Math.floor(Math.min(5200, Math.max(1800, (cssW * cssH) / 35)));
+      for (let i = 0; i < dots; i++) {
+        const x = Math.random() * cssW;
+        const y = Math.random() * cssH;
+        const r = Math.random() * 1.9;
+        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.085)' : 'rgba(0,0,0,0.075)';
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
       }
 
       // brilho leve
-      const grd = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-      grd.addColorStop(0, 'rgba(255,255,255,0.10)');
+      const grd = ctx.createLinearGradient(0, 0, cssW, cssH);
+      grd.addColorStop(0, 'rgba(255,255,255,0.12)');
       grd.addColorStop(0.5, 'rgba(255,255,255,0.00)');
-      grd.addColorStop(1, 'rgba(0,0,0,0.08)');
+      grd.addColorStop(1, 'rgba(0,0,0,0.10)');
       ctx.fillStyle = grd;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, cssW, cssH);
 
       // texto central responsivo
       ctx.save();
-      ctx.fillStyle = 'rgba(255,255,255,0.26)';
-      const fontSize = Math.max(18, Math.floor(canvas.width * 0.12));
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+      const fontSize = Math.max(18, Math.floor(cssW * 0.12));
       ctx.font = `900 ${fontSize}px Fredoka, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.translate(cssW / 2, cssH / 2);
       ctx.rotate(-0.12);
       ctx.fillText('RASPE AQUI', 0, 0);
       ctx.restore();
-    }, []);
+    }, [resizeCanvasToDpr]);
 
     useEffect(() => {
       drawTexture();
@@ -174,30 +195,54 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
       return () => window.removeEventListener('resize', onResize);
     }, [drawTexture]);
 
-    const eraseAt = (clientX: number, clientY: number) => {
+    const getBrushRadius = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return 28;
+      const dpr = dprRef.current;
+      const cssW = canvas.width / dpr;
+      const cssH = canvas.height / dpr;
+      const base = Math.min(cssW, cssH);
+      return Math.max(26, Math.min(44, Math.floor(base * 0.08)));
+    };
+
+    const eraseLine = (x: number, y: number) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const rect = canvas.getBoundingClientRect();
-      const x = clientX - rect.left;
-      const y = clientY - rect.top;
+      const dpr = dprRef.current;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       ctx.save();
       ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const r = getBrushRadius();
+      ctx.lineWidth = r * 2;
+
+      const last = lastPointRef.current;
       ctx.beginPath();
-      ctx.arc(x, y, 26, 0, Math.PI * 2);
-      ctx.fill();
+      if (last) {
+        ctx.moveTo(last.x, last.y);
+      } else {
+        ctx.moveTo(x, y);
+      }
+      ctx.lineTo(x, y);
+      ctx.stroke();
       ctx.restore();
+
+      lastPointRef.current = { x, y };
     };
 
     const scratchedEnough = () => {
       const canvas = canvasRef.current;
       if (!canvas) return false;
 
-      const w = 120;
-      const h = 160;
+      // amostra pequena pra ser rápido
+      const w = 140;
+      const h = 190;
       const off = document.createElement('canvas');
       off.width = w;
       off.height = h;
@@ -212,19 +257,32 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
       for (let i = 3; i < img.length; i += 4) {
         if (img[i] < 80) cleared++;
       }
-      return cleared / total >= 0.65;
+
+      // mais fácil (antes estava 0.65)
+      return cleared / total >= 0.55;
     };
 
     const handleDown = (e: React.PointerEvent) => {
       if (doneRef.current) return;
       isDownRef.current = true;
-      (e.target as any).setPointerCapture?.(e.pointerId);
-      eraseAt(e.clientX, e.clientY);
+      lastPointRef.current = null;
+      (e.currentTarget as any).setPointerCapture?.(e.pointerId);
+
+      const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      eraseLine(x, y);
     };
 
     const handleMove = (e: React.PointerEvent) => {
       if (!isDownRef.current || doneRef.current) return;
-      eraseAt(e.clientX, e.clientY);
+
+      const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      eraseLine(x, y);
 
       const now = Date.now();
       if (now - lastCheckRef.current > 220) {
@@ -238,6 +296,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
 
     const handleUp = () => {
       isDownRef.current = false;
+      lastPointRef.current = null;
     };
 
     return (
@@ -389,9 +448,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
     <div className="space-y-8 pb-12 animate-in fade-in duration-500">
       <div className="bg-white rounded-[3rem] p-8 md:p-10 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] flex flex-col md:flex-row items-center gap-8 md:gap-12">
         <div onClick={() => setIsAvatarPickerOpen(true)} className="relative group cursor-pointer">
-          <div className={`w-32 h-32 md:w-40 md:h-40 bg-slate-100 rounded-full border-[6px] shadow-xl overflow-hidden relative transition-transform group-hover:scale-105 active:scale-95 ${
-            isUnstoppable ? 'border-orange-500' : 'border-indigo-950'
-          }`}>
+          <div
+            className={`w-32 h-32 md:w-40 md:h-40 bg-slate-100 rounded-full border-[6px] shadow-xl overflow-hidden relative transition-transform group-hover:scale-105 active:scale-95 ${
+              isUnstoppable ? 'border-orange-500' : 'border-indigo-950'
+            }`}
+          >
             {avatarDisplayUrl ? (
               <img src={avatarDisplayUrl} className="w-full h-full object-cover" />
             ) : (
