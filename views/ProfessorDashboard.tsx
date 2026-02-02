@@ -1,8 +1,21 @@
+// src/views/ProfessorDashboard.tsx
 import React, { useState, useMemo } from 'react';
 import { AppData, User, UserRole } from '../types';
 import {
-  CheckCircle, Plus, LayoutGrid, Users as UsersIcon, UserCircle, Star, XCircle,
-  BarChart3, Edit2, Trash2, X, Search, ArrowUpDown
+  CheckCircle,
+  Plus,
+  LayoutGrid,
+  Users as UsersIcon,
+  UserCircle,
+  Star,
+  XCircle,
+  BarChart3,
+  Edit2,
+  Trash2,
+  X,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  Filter
 } from 'lucide-react';
 import AvatarPickerModal from './AvatarPickerModal';
 
@@ -17,24 +30,37 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
   const [activeTab, setActiveTab] = useState<'students' | 'grid' | 'classification'>('grid');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
-  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
-  const [editingStudentForm, setEditingStudentForm] = useState({ name: '', login: '', password: '', serie: '', ciclo: 'Anos Iniciais' as User['ciclo'] });
-  const [studentForm, setStudentForm] = useState({ name: '', login: '', password: '', serie: '', ciclo: 'Anos Iniciais' as User['ciclo'] });
 
-  // filtros/ordenação da classificação
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [editingStudentForm, setEditingStudentForm] = useState({
+    name: '',
+    login: '',
+    password: '',
+    serie: '',
+    ciclo: 'Anos Iniciais' as User['ciclo']
+  });
+
+  const [studentForm, setStudentForm] = useState({
+    name: '',
+    login: '',
+    password: '',
+    serie: '',
+    ciclo: 'Anos Iniciais' as User['ciclo']
+  });
+
+  // filtros e ordenação da CLASSIFICAÇÃO
   const [filterCiclo, setFilterCiclo] = useState<string>('Todos');
-  const [filterSerie, setFilterSerie] = useState<string>('Todas');
-  const [searchName, setSearchName] = useState<string>('');
+  const [filterSerie, setFilterSerie] = useState<string>('');
   const [sortOrder, setSortOrder] = useState<'presenca' | 'falta'>('falta');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const myStudents = useMemo(() => data.students.filter(s => s.professorId === user.id), [data.students, user.id]);
 
-  const uniqueSeries = useMemo(() => {
-    const set = new Set<string>();
-    myStudents.forEach(s => { if (s.serie) set.add(s.serie); });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [myStudents]);
+  const getAvatarUrl = (u: User) => {
+    if (u.avatarUrl) return u.avatarUrl;
+    if (u.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
+    return null;
+  };
 
   const handleAddStudent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,58 +82,62 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
   const handleEditStudent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingStudentId) return;
-    const updatedStudents = data.students.map(s => s.id === editingStudentId ? { ...s, ...editingStudentForm } : s);
-    updateData({ students: updatedStudents });
-    setEditingStudentId(null);
+    if (editingStudentId) {
+      const updatedStudents = data.students.map(s => (s.id === editingStudentId ? { ...s, ...editingStudentForm } : s));
+      updateData({ students: updatedStudents });
+      setEditingStudentId(null);
+    }
   };
 
-  // regra atual: alterna verde/falta/remover
   const toggleSticker = (alunoId: string, week: number) => {
     let newStickers = [...data.studentStickers];
-    const idx = newStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
+    const existingIndex = newStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
 
-    if (idx === -1) {
-      newStickers.push({ alunoId, week, liberada: true, revelada: false, reconquistada: false, isFalta: false, date: new Date().toISOString() });
+    if (existingIndex === -1) {
+      newStickers.push({
+        alunoId,
+        week,
+        liberada: true,
+        revelada: false,
+        reconquistada: false,
+        isFalta: false,
+        date: new Date().toISOString()
+      });
     } else {
-      const st = newStickers[idx];
-      if (st.liberada && !st.isFalta) newStickers[idx] = { ...st, liberada: false, isFalta: true };
-      else newStickers.splice(idx, 1);
+      const sticker = newStickers[existingIndex];
+
+      // regra: professor só marca falta, ou remove a marcação
+      if (sticker.liberada && !sticker.isFalta) {
+        newStickers[existingIndex] = { ...sticker, liberada: false, isFalta: true };
+      } else {
+        newStickers.splice(existingIndex, 1);
+      }
     }
+
     updateData({ studentStickers: newStickers });
   };
 
-  const getAvatarUrl = (u: User) => {
-    if (u.avatarUrl) return u.avatarUrl;
-    if (u.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
-    return null;
-  };
-
   const classificationData = useMemo(() => {
-    const base = myStudents.map(student => {
-      const stickers = data.studentStickers.filter(s => s.alunoId === student.id);
-      return {
-        ...student,
-        presencas: stickers.filter(s => s.liberada && !s.isFalta).length,
-        faltas: stickers.filter(s => s.isFalta).length
-      };
-    });
-
-    const filtered = base.filter(s => {
-      const cicloOk = filterCiclo === 'Todos' || s.ciclo === filterCiclo;
-      const serieOk = filterSerie === 'Todas' || (s.serie || '') === filterSerie;
-      const nameOk = !searchName || s.name.toLowerCase().includes(searchName.toLowerCase());
-      return cicloOk && serieOk && nameOk;
-    });
-
-    filtered.sort((a, b) => {
-      const valA = sortOrder === 'presenca' ? a.presencas : a.faltas;
-      const valB = sortOrder === 'presenca' ? b.presencas : b.faltas;
-      return sortDirection === 'desc' ? valB - valA : valA - valB;
-    });
-
-    return filtered;
-  }, [myStudents, data.studentStickers, filterCiclo, filterSerie, searchName, sortOrder, sortDirection]);
+    return myStudents
+      .map(student => {
+        const stickers = data.studentStickers.filter(s => s.alunoId === student.id);
+        return {
+          ...student,
+          presencas: stickers.filter(s => s.liberada && !s.isFalta).length,
+          faltas: stickers.filter(s => s.isFalta).length
+        };
+      })
+      .filter(s => {
+        const matchCiclo = filterCiclo === 'Todos' || s.ciclo === filterCiclo;
+        const matchSerie = !filterSerie || (s.serie || '').toLowerCase().includes(filterSerie.toLowerCase());
+        return matchCiclo && matchSerie;
+      })
+      .sort((a, b) => {
+        const valA = sortOrder === 'presenca' ? a.presencas : a.faltas;
+        const valB = sortOrder === 'presenca' ? b.presencas : b.faltas;
+        return sortDirection === 'desc' ? valB - valA : valA - valB;
+      });
+  }, [myStudents, data.studentStickers, filterCiclo, filterSerie, sortOrder, sortDirection]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
@@ -122,7 +152,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
               </div>
             )}
           </div>
-          <div className="absolute -bottom-2 -right-2 bg-yellow-400 p-3 rounded-2xl border-4 border-indigo-950 shadow-lg -rotate-12 group-hover:rotate-0 transition-all">
+          <div className="absolute -bottom-2 -right-2 bg-yellow-400 p-3 rounded-2xl border-4 border-indigo-950 shadow-lg group-hover:rotate-0 transition-all">
             <Star size={20} className="text-indigo-950" fill="currentColor" />
           </div>
         </div>
@@ -140,13 +170,28 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
       </div>
 
       <div className="flex bg-indigo-950 p-2 rounded-[2.5rem] gap-2 border-4 border-white/20 shadow-xl flex-wrap">
-        <button onClick={() => setActiveTab('grid')} className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'grid' ? 'bg-indigo-600 text-white shadow-lg border-2 border-white/20' : 'text-indigo-300 hover:bg-white/5'}`}>
+        <button
+          onClick={() => setActiveTab('grid')}
+          className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${
+            activeTab === 'grid' ? 'bg-indigo-600 text-white shadow-lg border-2 border-white/20' : 'text-indigo-300 hover:bg-white/5'
+          }`}
+        >
           <LayoutGrid size={18} /> Painel de Presença
         </button>
-        <button onClick={() => setActiveTab('classification')} className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'classification' ? 'bg-orange-500 text-white shadow-lg border-2 border-white/20' : 'text-indigo-300 hover:bg-white/5'}`}>
+        <button
+          onClick={() => setActiveTab('classification')}
+          className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${
+            activeTab === 'classification' ? 'bg-orange-500 text-white shadow-lg border-2 border-white/20' : 'text-indigo-300 hover:bg-white/5'
+          }`}
+        >
           <BarChart3 size={18} /> Classificação
         </button>
-        <button onClick={() => setActiveTab('students')} className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'students' ? 'bg-indigo-600 text-white shadow-lg border-2 border-white/20' : 'text-indigo-300 hover:bg-white/5'}`}>
+        <button
+          onClick={() => setActiveTab('students')}
+          className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${
+            activeTab === 'students' ? 'bg-indigo-600 text-white shadow-lg border-2 border-white/20' : 'text-indigo-300 hover:bg-white/5'
+          }`}
+        >
           <UsersIcon size={18} /> Gerenciar Alunos
         </button>
       </div>
@@ -156,7 +201,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
           <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950 mb-8 border-b-4 border-indigo-50 pb-4">
             Frequência da Turma
           </h2>
-
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-separate border-spacing-0">
               <thead>
@@ -165,41 +209,52 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                     Estudante
                   </th>
                   {Array.from({ length: 45 }, (_, i) => i + 1).map(w => (
-                    <th key={w} className={`py-6 px-2 border-b-4 border-indigo-50 text-center min-w-[60px] text-[11px] font-black ${w === data.currentWeek ? 'bg-yellow-100 text-indigo-900 shadow-inner' : 'text-slate-300'}`}>
+                    <th
+                      key={w}
+                      className={`py-6 px-2 border-b-4 border-indigo-50 text-center min-w-[60px] text-[11px] font-black ${
+                        w === data.currentWeek ? 'bg-yellow-100 text-indigo-900 shadow-inner' : 'text-slate-300'
+                      }`}
+                    >
                       S{w}
                     </th>
                   ))}
                 </tr>
               </thead>
-
               <tbody>
                 {myStudents.map(student => (
                   <tr key={student.id} className="group">
                     <td className="py-5 px-4 font-black text-indigo-950 sticky left-0 bg-white z-20 border-b-2 border-slate-50 border-r-2 uppercase italic text-[13px] tracking-tighter truncate">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg border-2 border-indigo-950 overflow-hidden bg-slate-100 flex-shrink-0">
-                          {getAvatarUrl(student) ? <img src={getAvatarUrl(student)!} className="w-full h-full object-cover" /> : <UserCircle className="text-slate-300" />}
+                          {getAvatarUrl(student) ? (
+                            <img src={getAvatarUrl(student)!} className="w-full h-full object-cover" />
+                          ) : (
+                            <UserCircle className="text-slate-300" />
+                          )}
                         </div>
                         <div className="flex flex-col">
                           <span className="truncate">{student.name}</span>
-                          <span className="text-[7px] text-indigo-400 leading-none">{student.serie} | {student.ciclo}</span>
+                          <span className="text-[7px] text-indigo-400 leading-none">
+                            {student.serie} | {student.ciclo}
+                          </span>
                         </div>
                       </div>
                     </td>
 
                     {Array.from({ length: 45 }, (_, i) => i + 1).map(w => {
-                      const st = data.studentStickers.find(s => s.alunoId === student.id && s.week === w);
-                      const isVerde = st?.liberada && !st?.isFalta;
-                      const isVermelho = st?.isFalta;
-
+                      const sticker = data.studentStickers.find(s => s.alunoId === student.id && s.week === w);
+                      const isVerde = sticker?.liberada && !sticker?.isFalta;
+                      const isVermelho = sticker?.isFalta;
                       return (
                         <td key={w} className={`py-4 px-1 border-b-2 border-slate-50 text-center ${w === data.currentWeek ? 'bg-yellow-50/20' : ''}`}>
                           <button
                             onClick={() => toggleSticker(student.id, w)}
                             className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center transition-all active:scale-90 border-4 ${
-                              isVerde ? 'bg-green-500 border-indigo-950 text-white shadow-lg' :
-                              isVermelho ? 'bg-red-500 border-indigo-950 text-white shadow-lg' :
-                              'bg-slate-50 border-slate-200 text-slate-200 hover:border-indigo-400 hover:text-indigo-400'
+                              isVerde
+                                ? 'bg-green-500 border-indigo-950 text-white shadow-lg'
+                                : isVermelho
+                                ? 'bg-red-500 border-indigo-950 text-white shadow-lg'
+                                : 'bg-slate-50 border-slate-200 text-slate-200 hover:border-indigo-400 hover:text-indigo-400'
                             }`}
                           >
                             {isVerde ? <CheckCircle size={20} strokeWidth={4} /> : isVermelho ? <XCircle size={20} strokeWidth={4} /> : <div className="w-2 h-2 rounded-full bg-current" />}
@@ -217,89 +272,100 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
       {activeTab === 'classification' && (
         <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
-            <div>
-              <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">Classificação da Turma</h2>
-              <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mt-2">
-                Filtre por turma e ordene por presenças ou faltas
-              </p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">Classificação da Turma</h2>
+
+            <div className="flex items-center gap-2 bg-indigo-950/5 px-4 py-3 rounded-[1.5rem] border-2 border-indigo-950/10">
+              <Filter size={16} className="text-indigo-950" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-950/70">Filtros</span>
             </div>
+          </div>
 
-            <div className="flex flex-wrap gap-3">
-              <div className="relative">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" />
-                <input
-                  value={searchName}
-                  onChange={(e) => setSearchName(e.target.value)}
-                  placeholder="Buscar aluno"
-                  className="pl-10 pr-4 py-3 rounded-2xl border-4 border-indigo-950 bg-slate-50 outline-none font-black text-indigo-950 text-[12px] w-[220px]"
-                />
-              </div>
-
+          {/* Controles */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Ciclo</label>
               <select
                 value={filterCiclo}
                 onChange={(e) => setFilterCiclo(e.target.value)}
-                className="py-3 px-4 rounded-2xl border-4 border-indigo-950 bg-slate-50 outline-none font-black text-indigo-950 text-[12px]"
+                className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white"
               >
-                <option value="Todos">Todos os ciclos</option>
+                <option value="Todos">Todos</option>
                 <option value="Anos Iniciais">Anos Iniciais</option>
                 <option value="Anos Finais">Anos Finais</option>
                 <option value="Ensino Médio">Ensino Médio</option>
               </select>
+            </div>
 
-              <select
+            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Série</label>
+              <input
                 value={filterSerie}
                 onChange={(e) => setFilterSerie(e.target.value)}
-                className="py-3 px-4 rounded-2xl border-4 border-indigo-950 bg-slate-50 outline-none font-black text-indigo-950 text-[12px]"
-              >
-                <option value="Todas">Todas as turmas</option>
-                {uniqueSeries.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+                placeholder="Ex: 9A, 1A..."
+                className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white"
+              />
+            </div>
 
+            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Ordenar por</label>
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value as any)}
-                className="py-3 px-4 rounded-2xl border-4 border-indigo-950 bg-slate-50 outline-none font-black text-indigo-950 text-[12px]"
+                className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white"
               >
-                <option value="falta">Ordenar por faltas</option>
-                <option value="presenca">Ordenar por presenças</option>
+                <option value="falta">Mais faltas</option>
+                <option value="presenca">Mais presenças</option>
               </select>
+            </div>
 
+            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Ordem</label>
               <button
-                onClick={() => setSortDirection(d => d === 'desc' ? 'asc' : 'desc')}
-                className="py-3 px-4 rounded-2xl border-4 border-indigo-950 bg-indigo-600 text-white font-black text-[12px] uppercase tracking-widest flex items-center gap-2 active:scale-95"
-                title="Alternar direção"
+                onClick={() => setSortDirection(prev => (prev === 'desc' ? 'asc' : 'desc'))}
+                className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white flex items-center justify-center gap-2"
               >
-                <ArrowUpDown size={16} /> {sortDirection === 'desc' ? 'Maior→Menor' : 'Menor→Maior'}
+                {sortDirection === 'desc' ? <ArrowDownAZ size={16} /> : <ArrowUpAZ size={16} />}
+                {sortDirection === 'desc' ? 'Maior → Menor' : 'Menor → Maior'}
               </button>
             </div>
           </div>
 
           <div className="space-y-4">
-            {classificationData.map((s, idx) => (
-              <div key={s.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
-                <div className="w-10 h-10 bg-indigo-950 text-white rounded-full flex items-center justify-center font-black italic">{idx + 1}º</div>
-                <div className="flex-1">
-                  <p className="font-black text-indigo-950 uppercase italic">{s.name}</p>
-                  <p className="text-[9px] font-black text-indigo-400 uppercase">{s.serie} • {s.ciclo}</p>
-                </div>
-                <div className="flex gap-6">
-                  <div className="text-center">
-                    <p className="text-[8px] font-black text-green-500 uppercase">Presenças</p>
-                    <p className="text-xl font-black text-indigo-950">{(s as any).presencas}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[8px] font-black text-red-500 uppercase">Faltas</p>
-                    <p className="text-xl font-black text-indigo-950">{(s as any).faltas}</p>
-                  </div>
-                </div>
+            {classificationData.length === 0 ? (
+              <div className="py-10 text-center text-slate-300 font-black uppercase tracking-widest italic">
+                Nenhum aluno encontrado com esses filtros.
               </div>
-            ))}
+            ) : (
+              classificationData.map((s, idx) => (
+                <div key={s.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
+                  <div className="w-10 h-10 bg-indigo-950 text-white rounded-full flex items-center justify-center font-black italic">
+                    {idx + 1}º
+                  </div>
 
-            {classificationData.length === 0 && (
-              <div className="py-12 text-center text-indigo-200 font-black uppercase tracking-widest">
-                Nenhum aluno encontrado com esses filtros
-              </div>
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="w-12 h-12 rounded-2xl border-4 border-indigo-950 overflow-hidden bg-white">
+                      {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" /> : <UserCircle className="text-slate-200" />}
+                    </div>
+
+                    <div className="flex-1">
+                      <p className="font-black text-indigo-950 uppercase italic">{s.name}</p>
+                      <p className="text-[9px] font-black text-indigo-400 uppercase">{s.serie} • {s.ciclo}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-6">
+                    <div className="text-center">
+                      <p className="text-[8px] font-black text-green-500 uppercase">Presenças</p>
+                      <p className="text-2xl font-black text-indigo-950">{s.presencas}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[8px] font-black text-red-500 uppercase">Faltas</p>
+                      <p className="text-2xl font-black text-indigo-950">{s.faltas}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -316,7 +382,10 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
           <div className="grid gap-6 md:grid-cols-2">
             {myStudents.map(s => (
-              <div key={s.id} className="bg-white text-indigo-950 p-8 rounded-[3rem] border-[8px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] flex flex-col gap-4 group transition-all hover:-translate-y-1">
+              <div
+                key={s.id}
+                className="bg-white text-indigo-950 p-8 rounded-[3rem] border-[8px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] flex flex-col gap-4 group transition-all hover:-translate-y-1"
+              >
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-2xl border-4 border-indigo-950 overflow-hidden bg-slate-100">
@@ -332,7 +401,13 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                     <button
                       onClick={() => {
                         setEditingStudentId(s.id);
-                        setEditingStudentForm({ name: s.name, login: s.login, password: s.password || '', serie: s.serie || '', ciclo: s.ciclo || 'Anos Iniciais' });
+                        setEditingStudentForm({
+                          name: s.name,
+                          login: s.login,
+                          password: s.password || '',
+                          serie: s.serie || '',
+                          ciclo: s.ciclo || 'Anos Iniciais'
+                        });
                       }}
                       className="bg-blue-100 p-3 rounded-2xl text-blue-600 hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-200"
                     >
@@ -342,7 +417,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                     <button
                       onClick={() => updateData({ students: data.students.filter(x => x.id !== s.id) })}
                       className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
-                      title="Deleção está ligada ao seu save."
+                      title="Deleção está ligada ao seu save. Se você quiser deleção definitiva no banco, a gente cria um endpoint depois."
                     >
                       <Trash2 size={20} strokeWidth={3} />
                     </button>
@@ -367,20 +442,51 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
             </button>
             <h3 className="text-4xl font-black mb-10 text-center italic uppercase tracking-tighter">Novo Aluno</h3>
             <form onSubmit={handleAddStudent} className="space-y-6">
-              <input required placeholder="Nome do Aluno" value={studentForm.name} onChange={e => setStudentForm({ ...studentForm, name: e.target.value })} className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg" />
+              <input
+                required
+                placeholder="Nome do Aluno"
+                value={studentForm.name}
+                onChange={e => setStudentForm({ ...studentForm, name: e.target.value })}
+                className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
+              />
               <div className="grid grid-cols-2 gap-6">
-                <input required placeholder="Login" value={studentForm.login} onChange={e => setStudentForm({ ...studentForm, login: e.target.value })} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
-                <input required placeholder="Senha" value={studentForm.password} onChange={e => setStudentForm({ ...studentForm, password: e.target.value })} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
+                <input
+                  required
+                  placeholder="Login"
+                  value={studentForm.login}
+                  onChange={e => setStudentForm({ ...studentForm, login: e.target.value })}
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                />
+                <input
+                  required
+                  placeholder="Senha"
+                  value={studentForm.password}
+                  onChange={e => setStudentForm({ ...studentForm, password: e.target.value })}
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                />
               </div>
               <div className="grid grid-cols-2 gap-6">
-                <input required placeholder="Série (ex: 1A)" value={studentForm.serie} onChange={e => setStudentForm({ ...studentForm, serie: e.target.value })} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
-                <select value={studentForm.ciclo} onChange={e => setStudentForm({ ...studentForm, ciclo: e.target.value as any })} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black">
+                <input
+                  required
+                  placeholder="Série (ex: 1A)"
+                  value={studentForm.serie}
+                  onChange={e => setStudentForm({ ...studentForm, serie: e.target.value })}
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                />
+                <select
+                  value={studentForm.ciclo}
+                  onChange={e => setStudentForm({ ...studentForm, ciclo: e.target.value as any })}
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                >
                   <option value="Anos Iniciais">Anos Iniciais</option>
                   <option value="Anos Finais">Anos Finais</option>
                   <option value="Ensino Médio">Ensino Médio</option>
                 </select>
               </div>
-              <button type="submit" className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95">
+              <button
+                type="submit"
+                className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95"
+              >
                 Salvar Aluno
               </button>
             </form>
@@ -396,20 +502,51 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
             </button>
             <h3 className="text-4xl font-black mb-10 text-center italic uppercase tracking-tighter">Editar Aluno</h3>
             <form onSubmit={handleEditStudent} className="space-y-6">
-              <input required placeholder="Nome do Aluno" value={editingStudentForm.name} onChange={e => setEditingStudentForm({ ...editingStudentForm, name: e.target.value })} className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg" />
+              <input
+                required
+                placeholder="Nome do Aluno"
+                value={editingStudentForm.name}
+                onChange={e => setEditingStudentForm({ ...editingStudentForm, name: e.target.value })}
+                className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
+              />
               <div className="grid grid-cols-2 gap-6">
-                <input required placeholder="Login" value={editingStudentForm.login} onChange={e => setEditingStudentForm({ ...editingStudentForm, login: e.target.value })} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
-                <input required placeholder="Senha" value={editingStudentForm.password} onChange={e => setEditingStudentForm({ ...editingStudentForm, password: e.target.value })} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
+                <input
+                  required
+                  placeholder="Login"
+                  value={editingStudentForm.login}
+                  onChange={e => setEditingStudentForm({ ...editingStudentForm, login: e.target.value })}
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                />
+                <input
+                  required
+                  placeholder="Senha"
+                  value={editingStudentForm.password}
+                  onChange={e => setEditingStudentForm({ ...editingStudentForm, password: e.target.value })}
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                />
               </div>
               <div className="grid grid-cols-2 gap-6">
-                <input required placeholder="Série" value={editingStudentForm.serie} onChange={e => setEditingStudentForm({ ...editingStudentForm, serie: e.target.value })} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black" />
-                <select value={editingStudentForm.ciclo} onChange={e => setEditingStudentForm({ ...editingStudentForm, ciclo: e.target.value as any })} className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black">
+                <input
+                  required
+                  placeholder="Série"
+                  value={editingStudentForm.serie}
+                  onChange={e => setEditingStudentForm({ ...editingStudentForm, serie: e.target.value })}
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                />
+                <select
+                  value={editingStudentForm.ciclo}
+                  onChange={e => setEditingStudentForm({ ...editingStudentForm, ciclo: e.target.value as any })}
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                >
                   <option value="Anos Iniciais">Anos Iniciais</option>
                   <option value="Anos Finais">Anos Finais</option>
                   <option value="Ensino Médio">Ensino Médio</option>
                 </select>
               </div>
-              <button type="submit" className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95">
+              <button
+                type="submit"
+                className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95"
+              >
                 Salvar Alterações
               </button>
             </form>
