@@ -111,6 +111,93 @@ export default async function handler(req, res) {
     }
 
     // =========================
+    // 4) FIGURINHAS (UPSERT ou DELETE por week)
+    // =========================
+    if (Array.isArray(stickers)) {
+      for (const st of stickers) {
+        if (!st?.week) continue;
+
+        const imageUrl = (st.imageUrl || '').trim();
+        const name = (st.name || `Semana ${st.week}`).trim();
+        const rarity = st.rarity || 'NORMAL';
+
+        // Se você "removeu" (imageUrl vazio), apaga do banco
+        if (!imageUrl) {
+          const { error: delErr } = await supabase.from('stickers').delete().eq('week', st.week);
+          if (delErr) throw new Error(`stickers delete week ${st.week}: ${delErr.message}`);
+          continue;
+        }
+
+        // Caso contrário, salva/substitui
+        const { error } = await supabase.from('stickers').upsert(
+          {
+            week: st.week,
+            name,
+            image_url: imageUrl,
+            rarity
+          },
+          { onConflict: 'week' }
+        );
+        if (error) throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
+      }
+    }
+
+    // =========================
+    // 5) student_stickers (UPSERT)
+    // =========================
+    if (Array.isArray(studentStickers) && studentStickers.length > 0) {
+      for (const ss of studentStickers) {
+        if (!ss?.week) continue;
+
+        let studentId = null;
+
+        // UUID direto
+        if (ss.alunoId && typeof ss.alunoId === 'string' && ss.alunoId.includes('-')) {
+          studentId = ss.alunoId;
+        } else {
+          const login = ss.alunoLogin || ss.alunoId;
+          if (login) {
+            const { data: st, error } = await supabase
+              .from('students')
+              .select('id')
+              .eq('login', login)
+              .single();
+
+            if (error) continue;
+            if (st?.id) studentId = st.id;
+          }
+        }
+
+        if (!studentId) continue;
+
+        const { error } = await supabase.from('student_stickers').upsert(
+          {
+            student_id: studentId,
+            week: ss.week,
+            liberada: !!ss.liberada,
+            revelada: !!ss.revelada,
+            is_falta: !!ss.isFalta,
+            reconquistada: !!ss.reconquistada
+          },
+          { onConflict: 'student_id, week' }
+        );
+        if (error) throw new Error(`student_stickers upsert ${studentId}/${ss.week}: ${error.message}`);
+      }
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: String(err?.message || err) });
+  }
+}        .filter(l => l && !incomingStudentLogins.has(l));
+
+      if (toDelete.length > 0) {
+        const { error: delErr } = await supabase.from('students').delete().in('login', toDelete);
+        if (delErr) throw new Error(`students delete: ${delErr.message}`);
+      }
+    }
+
+    // =========================
     // 4) FIGURINHAS (UPSERT)
     // =========================
     if (Array.isArray(stickers)) {
