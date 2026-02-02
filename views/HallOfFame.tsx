@@ -35,14 +35,21 @@ const HallOfFame: React.FC<HallOfFameProps> = ({ data, onClose }) => {
   };
 
   const computeCurrentStreak = (stickers: any[]) => {
-    let streak = 0;
-    for (let w = data.currentWeek; w >= 1; w--) {
-      const s = stickers.find((st: any) => st.week === w);
-      if (s && s.liberada && !s.isFalta) streak++;
-      else break;
-    }
-    return streak;
-  };
+  // se a semana atual ainda não tem registro, começa na anterior
+  let startWeek = data.currentWeek;
+  const hasWeek = (w: number) => stickers.some((st: any) => st.week === w);
+
+  if (!hasWeek(startWeek)) startWeek = startWeek - 1;
+  if (startWeek < 1) return 0;
+
+  let streak = 0;
+  for (let w = startWeek; w >= 1; w--) {
+    const s = stickers.find((st: any) => st.week === w);
+    if (s && s.liberada && !s.isFalta) streak++;
+    else break;
+  }
+  return streak;
+};
 
   const ranking = useMemo<RankingRow[]>(() => {
     return data.students
