@@ -42,13 +42,20 @@ const HallOfFame: React.FC<HallOfFameProps> = ({ data, onClose }) => {
   if (!hasWeek(startWeek)) startWeek = startWeek - 1;
   if (startWeek < 1) return 0;
 
-  let streak = 0;
-  for (let w = startWeek; w >= 1; w--) {
+    let best = 0;
+  let run = 0;
+
+  for (let w = 1; w <= data.currentWeek; w++) {
     const s = stickers.find((st: any) => st.week === w);
-    if (s && s.liberada && !s.isFalta) streak++;
-    else break;
+    if (s && s.liberada && !s.isFalta) {
+      run++;
+      if (run > best) best = run;
+    } else {
+      run = 0;
+    }
   }
-  return streak;
+
+  return best;
 };
 
   const ranking = useMemo<RankingRow[]>(() => {
