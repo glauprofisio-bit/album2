@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AppData, StickerRarity, User } from '../types';
 import {
   Trophy,
@@ -26,6 +26,8 @@ type RankingRow = User & {
 };
 
 const HallOfFame: React.FC<HallOfFameProps> = ({ data, onClose }) => {
+  const [showFullRanking, setShowFullRanking] = useState(false);
+
   const getAvatarUrl = (u: User) => {
     if (u.avatarUrl) return u.avatarUrl;
     if (u.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
@@ -33,7 +35,6 @@ const HallOfFame: React.FC<HallOfFameProps> = ({ data, onClose }) => {
   };
 
   const computeCurrentStreak = (stickers: any[]) => {
-    // sequência atual: começa na semana atual e vai voltando até quebrar
     let streak = 0;
     for (let w = data.currentWeek; w >= 1; w--) {
       const s = stickers.find((st: any) => st.week === w);
@@ -69,7 +70,6 @@ const HallOfFame: React.FC<HallOfFameProps> = ({ data, onClose }) => {
         };
       })
       .sort((a, b) => {
-        // ranking geral: total, depois reconquistas, depois nome
         if (b.total !== a.total) return b.total - a.total;
         if (b.reconquistadas !== a.reconquistadas) return b.reconquistadas - a.reconquistadas;
         return a.name.localeCompare(b.name);
@@ -80,12 +80,10 @@ const HallOfFame: React.FC<HallOfFameProps> = ({ data, onClose }) => {
   const rest = ranking.slice(3);
 
   const clubRares = useMemo(() => {
-    // Clube dos Raros: pelo menos 1 rara (Diamante/Ouro/Obsidiana) revelada
     return ranking.filter(s => s.rareCount > 0);
   }, [ranking]);
 
   const unstoppables = useMemo(() => {
-    // Imparáveis: sequência atual >= 4
     return ranking
       .filter(s => s.currentStreak >= 4)
       .sort((a, b) => b.currentStreak - a.currentStreak);
@@ -352,88 +350,95 @@ const HallOfFame: React.FC<HallOfFameProps> = ({ data, onClose }) => {
         </div>
       </div>
 
-      {/* RANKING GERAL (SEM “ALUNO PERDIDO”) */}
+      {/* RANKING COMPLETO (COLAPSÁVEL) */}
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex flex-col items-center gap-4 mb-8 mt-6">
-          <h3 className="font-black uppercase text-white/25 text-[10px] md:text-xs tracking-[0.7em] italic">
-            Ranking Geral dos Colecionadores
-          </h3>
+          <button
+            onClick={() => setShowFullRanking(v => !v)}
+            className="bg-white/10 hover:bg-white/15 text-white px-8 py-4 rounded-[2rem] border-2 border-white/10 font-black uppercase tracking-[0.25em] text-[10px] transition-all active:scale-95"
+          >
+            {showFullRanking ? 'Esconder ranking completo' : 'Ver ranking completo'}
+          </button>
           <div className="h-1 w-24 bg-white/10 rounded-full" />
         </div>
 
-        {rest.length === 0 ? (
-          <div className="py-10 text-center text-white/15 font-black uppercase tracking-widest italic">
-            Sem posições além do pódio ainda...
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {rest.map((student, idx) => (
-              <div
-                key={student.id}
-                className="bg-white rounded-[2.5rem] p-6 border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] flex items-center justify-between transition-transform duration-300"
-              >
-                <div className="flex items-center gap-8">
-                  <span className="text-3xl font-black text-indigo-100 italic w-12 text-center">
-                    #{idx + 4}
-                  </span>
-
-                  <div className="relative">
-                    <div className={`w-16 h-16 rounded-2xl overflow-hidden bg-slate-50 flex items-center justify-center shadow-inner border-[6px] ${
-                      student.currentStreak >= 4 ? 'border-orange-500' : 'border-indigo-950'
-                    }`}>
-                      {getAvatarUrl(student) ? (
-                        <img src={getAvatarUrl(student)!} className="w-full h-full object-cover" />
-                      ) : (
-                        <UserCircle className="text-slate-200" size={40} />
-                      )}
-                    </div>
-                    {student.currentStreak >= 4 && <UnstoppableBadge />}
-                  </div>
-
-                  <div className="space-y-1">
-                    <p className="font-black text-indigo-950 uppercase italic text-2xl tracking-tighter leading-none">
-                      {student.name}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      {student.rareCount > 0 && (
-                        <span className="text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest border-2 bg-cyan-50 border-cyan-200 text-cyan-600">
-                          Clube dos Raros
-                        </span>
-                      )}
-                      {student.currentStreak >= 4 && (
-                        <span className="bg-orange-50 border-2 border-orange-100 text-orange-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
-                          <Flame size={10} fill="currentColor" /> {student.currentStreak} semanas
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-8">
-                  <div className="text-right">
-                    <p className="text-3xl font-black text-indigo-950 uppercase leading-none italic">
-                      {student.total}
-                    </p>
-                    <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mt-1">
-                      Total
-                    </p>
-                  </div>
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border-4 border-indigo-950 transition-all ${
-                    student.total >= 10 ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-100'
-                  }`}>
-                    <Medal size={28} />
-                  </div>
-                </div>
+        {showFullRanking && (
+          <>
+            {rest.length === 0 ? (
+              <div className="py-10 text-center text-white/15 font-black uppercase tracking-widest italic">
+                Sem posições além do pódio ainda...
               </div>
-            ))}
-          </div>
-        )}
+            ) : (
+              <div className="space-y-6">
+                {rest.map((student, idx) => (
+                  <div
+                    key={student.id}
+                    className="bg-white rounded-[2.5rem] p-6 border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] flex items-center justify-between transition-transform duration-300"
+                  >
+                    <div className="flex items-center gap-8">
+                      <span className="text-3xl font-black text-indigo-100 italic w-12 text-center">
+                        #{idx + 4}
+                      </span>
 
-        <div className="text-center pt-10 pb-10 opacity-30">
-          <p className="text-[10px] font-black uppercase tracking-[0.5em] italic">
-            Atualizado em Tempo Real
-          </p>
-        </div>
+                      <div className="relative">
+                        <div className={`w-16 h-16 rounded-2xl overflow-hidden bg-slate-50 flex items-center justify-center shadow-inner border-[6px] ${
+                          student.currentStreak >= 4 ? 'border-orange-500' : 'border-indigo-950'
+                        }`}>
+                          {getAvatarUrl(student) ? (
+                            <img src={getAvatarUrl(student)!} className="w-full h-full object-cover" />
+                          ) : (
+                            <UserCircle className="text-slate-200" size={40} />
+                          )}
+                        </div>
+                        {student.currentStreak >= 4 && <UnstoppableBadge />}
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="font-black text-indigo-950 uppercase italic text-2xl tracking-tighter leading-none">
+                          {student.name}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {student.rareCount > 0 && (
+                            <span className="text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest border-2 bg-cyan-50 border-cyan-200 text-cyan-600">
+                              Clube dos Raros
+                            </span>
+                          )}
+                          {student.currentStreak >= 4 && (
+                            <span className="bg-orange-50 border-2 border-orange-100 text-orange-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                              <Flame size={10} fill="currentColor" /> {student.currentStreak} semanas
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-8">
+                      <div className="text-right">
+                        <p className="text-3xl font-black text-indigo-950 uppercase leading-none italic">
+                          {student.total}
+                        </p>
+                        <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mt-1">
+                          Total
+                        </p>
+                      </div>
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border-4 border-indigo-950 transition-all ${
+                        student.total >= 10 ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-100'
+                      }`}>
+                        <Medal size={28} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="text-center pt-10 pb-10 opacity-30">
+              <p className="text-[10px] font-black uppercase tracking-[0.5em] italic">
+                Atualizado em Tempo Real
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
