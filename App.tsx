@@ -40,8 +40,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     performSync(true);
-    const interval = setInterval(() => performSync(false), 30000);
-    return () => clearInterval(interval);
+    // DESATIVADO: Sincronização automática agressiva removida para evitar perda de dados local
+    // const interval = setInterval(() => performSync(false), 30000);
+    // return () => clearInterval(interval);
   }, [performSync]);
 
   const updateData = async (newData: Partial<AppData>) => {
@@ -65,16 +66,16 @@ const App: React.FC = () => {
       try {
         await saveData(dataToSave);
         
-        // Se houver atualizações pendentes que chegaram enquanto salvávamos
         if (pendingUpdateRef.current) {
           const nextData = pendingUpdateRef.current;
           pendingUpdateRef.current = null;
           await trySave(nextData);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Erro ao salvar dados:', e);
-        // Em caso de erro crítico, tenta sincronizar para não perder o estado do servidor
-        performSync(true);
+        // MOSTRAR ERRO NA TELA PARA O USUÁRIO
+        alert('ERRO AO SALVAR NO BANCO: ' + (e.message || 'Erro desconhecido'));
+        // NÃO rodar performSync(true) em caso de erro para não apagar o que o usuário fez
       }
     };
 
