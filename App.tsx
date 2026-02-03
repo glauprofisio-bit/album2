@@ -39,31 +39,43 @@ const App: React.FC = () => {
   }, [performSync]);
 
   const updateData = async (newData: Partial<AppData>) => {
-  if (isBusyRef.current) return;
+    if (isBusyRef.current) return;
 
-  const previousData = data;
-  const updatedData = { ...data, ...newData };
+    const previousData = data;
+    const updatedData = { ...data, ...newData };
 
-  isBusyRef.current = true;
-  setIsSaving(true);
+    isBusyRef.current = true;
+    setIsSaving(true);
 
-  // otimista: mostra na tela
-  setData(updatedData);
+    // Otimista: mostra na tela imediatamente
+    setData(updatedData);
 
-  try {
-    await saveData(updatedData);
-  } catch (e) {
-    // volta exatamente como estava antes
-    setData(previousData);
-    alert('Não salvou no servidor. Vou desfazer a alteração. (Confira a Vercel > Functions Logs)');
-    console.error('Erro ao salvar:', e);
-  } finally {
-    setTimeout(() => {
+    const trySave = async (retries = 3): Promise<boolean> => {
+      try {
+        await saveData(updatedData);
+        return true;
+      } catch (e) {
+        if (retries > 0) {
+          console.warn(`Tentativa de salvamento falhou. Restam ${retries} tentativas...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return trySave(retries - 1);
+        }
+        throw e;
+      }
+    };
+
+    try {
+      await trySave();
+    } catch (e) {
+      // Se falhar após as tentativas, avisa o usuário e volta o dado
+      setData(previousData);
+      alert('O servidor está um pouco lento agora. Por favor, tente novamente em alguns segundos.');
+      console.error('Erro persistente ao salvar:', e);
+    } finally {
       isBusyRef.current = false;
       setIsSaving(false);
-    }, 500);
-  }
-};
+    }
+  };
 
   // ✅ RESOLVE USUÁRIO PELO ID (evita “voltar pro aluno”)
   const currentUser = useMemo(() => {
