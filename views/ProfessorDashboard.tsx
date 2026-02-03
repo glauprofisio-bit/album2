@@ -144,8 +144,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
       }
     }
 
-    // Atualização local imediata para feedback instantâneo
-    data.studentStickers = newStickers;
+    // Chamamos updateData que já faz a atualização otimista do estado no App.tsx
     updateData({ studentStickers: newStickers });
   };
 

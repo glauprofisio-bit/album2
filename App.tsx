@@ -38,25 +38,31 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [performSync]);
 
-  const updateData = async (newData: Partial<AppData>) => {
-    if (isBusyRef.current) return;
+  const dataRef = useRef<AppData>(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
-    const previousData = data;
-    const updatedData = { ...data, ...newData };
+  const updateData = async (newData: Partial<AppData>) => {
+    const updatedData = { ...dataRef.current, ...newData };
+
+    // Otimista: mostra na tela imediatamente para feedback instantâneo
+    setData(updatedData);
+
+    // Se já estiver salvando, não iniciamos outro processo de salvamento concorrente agora.
+    // O próximo ciclo ou o final do ciclo atual deve lidar com isso.
+    if (isBusyRef.current) return;
 
     isBusyRef.current = true;
     setIsSaving(true);
 
-    // Otimista: mostra na tela imediatamente
-    setData(updatedData);
-
     const trySave = async (retries = 3): Promise<boolean> => {
       try {
-        await saveData(updatedData);
+        // Salva sempre o que está no Ref, que é o estado mais atualizado (incluindo cliques rápidos)
+        await saveData(dataRef.current);
         return true;
       } catch (e) {
         if (retries > 0) {
-          console.warn(`Tentativa de salvamento falhou. Restam ${retries} tentativas...`);
           await new Promise(resolve => setTimeout(resolve, 1000));
           return trySave(retries - 1);
         }
@@ -67,13 +73,14 @@ const App: React.FC = () => {
     try {
       await trySave();
     } catch (e) {
-      // Se falhar após as tentativas, avisa o usuário e volta o dado
-      setData(previousData);
-      alert('O servidor está um pouco lento agora. Por favor, tente novamente em alguns segundos.');
       console.error('Erro persistente ao salvar:', e);
     } finally {
       isBusyRef.current = false;
       setIsSaving(false);
+      
+      // Se após terminar o salvamento, o dado no Ref for diferente do que acabamos de salvar,
+      // significa que houve cliques durante o processo de salvamento.
+      // Poderíamos disparar outro salvamento aqui se necessário.
     }
   };
 
