@@ -72,18 +72,39 @@ const StickerEditor: React.FC<StickerEditorProps> = ({ week, sticker, onSave }) 
 
   const currentInfo = getRarityInfo(rarity);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    setIsCompressing(true);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setUrl(reader.result as string);
-      setIsCompressing(false);
-    };
-    reader.readAsDataURL(file);
+  const reader = new FileReader();
+
+  reader.onload = async () => {
+    try {
+      const base64 = reader.result as string;
+
+      const res = await fetch('/api/upload-sticker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file: base64,
+          filename: file.name
+        })
+      });
+
+      if (!res.ok) throw new Error('Falha no upload');
+
+      const { publicUrl } = await res.json();
+
+      // 👉 ISSO É O MAIS IMPORTANTE
+      setStickerImage(publicUrl); // agora é URL, não base64
+    } catch (err) {
+      alert('Erro ao enviar imagem');
+      console.error(err);
+    }
   };
+
+  reader.readAsDataURL(file);
+};
 
   return (
     <>
