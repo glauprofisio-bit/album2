@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
+const url = process.env.SUPABASE_URL || 'https://bumcjbjnkblzvrjpvafn.supabase.co';
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_vv0rmziTgicFQs1v36ANjw_md444UQy';
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,10 +13,6 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    // Chaves reais forçadas para evitar erro 500 na Vercel
-    const url = 'https://bumcjbjnkblzvrjpvafn.supabase.co';
-    const serviceKey = 'sb_secret_vv0rmziTgicFQs1v36ANjw_md444UQy';
-
     if (!url || !serviceKey) {
       return res.status(500).json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
     }
@@ -28,164 +27,120 @@ export default async function handler(req, res) {
       currentWeek
     } = req.body || {};
 
-    // 1. Configurações Globais
+    // 1) Config global
     if (currentWeek !== undefined && currentWeek !== null) {
-      await supabase
+      const { error } = await supabase
         .from('app_settings')
         .upsert({ id: 'global', current_week: currentWeek }, { onConflict: 'id' });
+      if (error) throw new Error(`app_settings: ${error.message}`);
     }
 
-    // 2. PROFESSORES
-    if (professors.length > 0) {
-      const profsToUpsert = professors
-        .filter(p => p?.login && p.id !== 'admin' && p.login !== 'admin')
-        .map(p => ({
-          name: p.name || '',
-          login: p.login,
-          password: p.password || '',
-          avatar_url: p.avatarUrl || '',
-          avatar_seed: p.avatarSeed || '',
-          // REMOVIDO: email (para evitar erro de UNIQUE e campo inexistente)
-          role: 'professor'
-        }));
+    // 2) Professores (upsert por login)
+    const profsToUpsert = (professors || [])
+      .filter(p => p?.login && p.login !== 'admin' && p.id !== 'admin')
+      .map(p => ({
+        name: p.name || '',
+        login: p.login,
+        password: p.password || '',
+        avatar_url: p.avatarUrl || '',
+        avatar_seed: p.avatarSeed || '',
+        role: 'professor'
+      }));
 
-      if (profsToUpsert.length > 0) {
-        const { error } = await supabase.from('professors').upsert(profsToUpsert, { onConflict: 'login' });
-        if (error) throw new Error(`Professors: ${error.message}`);
-      }
-
-      // Sincronização de Professores
-      const incomingProfLogins = new Set(profsToUpsert.map(p => p.login));
-      const { data: existingProfs } = await supabase.from('professors').select('id,login');
-      const toDelete = (existingProfs || []).filter(r => r.login !== 'admin' && !incomingProfLogins.has(r.login));
-
-      if (toDelete.length > 0) {
-        const idsToDelete = toDelete.map(x => x.id);
-        await supabase.from('students').update({ professor_id: null }).in('professor_id', idsToDelete);
-        await supabase.from('professors').delete().in('id', idsToDelete);
-      }
+    if (profsToUpsert.length > 0) {
+      const { error } = await supabase.from('professors').upsert(profsToUpsert, { onConflict: 'login' });
+      if (error) throw new Error(`professors: ${error.message}`);
     }
 
-    // 3. ALUNOS
-    if (students.length > 0) {
-      // Precisamos pegar os IDs reais dos professores para vincular os alunos corretamente
-      const { data: allProfs } = await supabase.from('professors').select('id, login');
-      const profMap = new Map();
-      (allProfs || []).forEach(p => profMap.set(p.login, p.id));
+    // mapa login->id real (uuid do banco)
+    const { data: allProfs, error: eAllProfs } = await supabase.from('professors').select('id,login');
+    if (eAllProfs) throw new Error(`professors select: ${eAllProfs.message}`);
 
-      const studentsToUpsert = [];
-      for (const s of students) {
-        if (!s?.login) continue;
-        
-        // Resolve o ID do professor pelo login, caso o ID enviado seja temporário
-        let realProfId = s.professorId;
-        const profByLogin = professors.find(p => p.id === s.professorId);
-        if (profByLogin && profMap.has(profByLogin.login)) {
-          realProfId = profMap.get(profByLogin.login);
+    const profMap = new Map();
+    (allProfs || []).forEach(p => profMap.set(p.login, p.id));
+
+    // 3) Alunos (upsert por login)
+    const studentsToUpsert = (students || [])
+      .filter(s => s?.login)
+      .map(s => {
+        // resolve professor_id pelo LOGIN quando vier id temporário do app
+        let resolvedProfId = s.professorId || null;
+
+        // se professorId for algo tipo "prof-1", tenta achar o professor pelo objeto local e mapear pro uuid real
+        const profObj = (professors || []).find(p => p.id === s.professorId || p.login === s.professorId);
+        if (profObj?.login && profMap.has(profObj.login)) {
+          resolvedProfId = profMap.get(profObj.login);
         }
 
-        studentsToUpsert.push({
+        // se professorId já for UUID do banco, mantém
+        return {
           name: s.name || '',
           login: s.login,
           password: s.password || '',
-          professor_id: realProfId || null,
+          professor_id: resolvedProfId,
           avatar_url: s.avatarUrl || '',
           avatar_seed: s.avatarSeed || '',
           serie: s.serie || '',
           ciclo: s.ciclo || null
-          // REMOVIDO: email
-        });
-      }
+        };
+      });
 
-      if (studentsToUpsert.length > 0) {
-        const { error } = await supabase.from('students').upsert(studentsToUpsert, { onConflict: 'login' });
-        if (error) throw new Error(`Students: ${error.message}`);
-      }
-
-      // Sincronização de Alunos
-      const incomingStudentLogins = new Set(studentsToUpsert.map(s => s.login));
-      const { data: existingStudents } = await supabase.from('students').select('id,login');
-      const toDelete = (existingStudents || []).filter(r => !incomingStudentLogins.has(r.login));
-
-      if (toDelete.length > 0) {
-        const idsToDelete = toDelete.map(x => x.id);
-        await supabase.from('student_stickers').delete().in('student_id', idsToDelete);
-        await supabase.from('students').delete().in('id', idsToDelete);
-      }
+    if (studentsToUpsert.length > 0) {
+      const { error } = await supabase.from('students').upsert(studentsToUpsert, { onConflict: 'login' });
+      if (error) throw new Error(`students: ${error.message}`);
     }
 
-    // 4. FIGURINHAS
-    if (stickers.length > 0) {
-      const stickersToUpsert = stickers
-        .filter(st => st?.week && String(st.imageUrl || '').trim())
-        .map(st => ({
-          week: st.week,
-          name: st.name || `Semana ${st.week}`,
-          image_url: st.imageUrl,
-          rarity: st.rarity || 'NORMAL'
-        }));
+    // mapa login->id real (alunos)
+    const { data: allStudents, error: eAllStudents } = await supabase.from('students').select('id,login');
+    if (eAllStudents) throw new Error(`students select: ${eAllStudents.message}`);
 
-      if (stickersToUpsert.length > 0) {
-        await supabase.from('stickers').upsert(stickersToUpsert, { onConflict: 'week' });
-      }
+    const studentMap = new Map();
+    (allStudents || []).forEach(s => studentMap.set(s.login, s.id));
 
-      const weeksToEmpty = stickers.filter(st => st?.week && !String(st.imageUrl || '').trim()).map(st => st.week);
-      if (weeksToEmpty.length > 0) {
-        await supabase.from('stickers').delete().in('week', weeksToEmpty);
-      }
+    // 4) Figurinhas (por week)
+    const stickersToUpsert = (stickers || [])
+      .filter(st => st?.week && String(st.imageUrl || '').trim())
+      .map(st => ({
+        week: st.week,
+        name: st.name || `Semana ${st.week}`,
+        image_url: st.imageUrl,
+        rarity: st.rarity || 'NORMAL'
+      }));
+
+    if (stickersToUpsert.length > 0) {
+      const { error } = await supabase.from('stickers').upsert(stickersToUpsert, { onConflict: 'week' });
+      if (error) throw new Error(`stickers: ${error.message}`);
     }
 
-    // 5. FIGURINHAS DOS ALUNOS
-    if (studentStickers.length > 0) {
-      // Precisamos dos IDs reais dos alunos e das figurinhas
-      const { data: allStudents } = await supabase.from('students').select('id, login');
-      const { data: allStickers } = await supabase.from('stickers').select('id, week');
-      
-      const studentMap = new Map();
-      (allStudents || []).forEach(s => studentMap.set(s.login, s.id));
-      
-      const stickerMap = new Map();
-      (allStickers || []).forEach(s => stickerMap.set(s.week, s.id));
+    // 5) Presenças / student_stickers (student_id uuid + week)
+    const ssToUpsert = (studentStickers || [])
+      .filter(ss => ss?.week)
+      .map(ss => {
+        // alunoId no app às vezes é login, às vezes id local.
+        // aqui vamos tentar resolver pelo login primeiro:
+        const resolvedStudentId =
+          (typeof ss.alunoId === 'string' && studentMap.has(ss.alunoId))
+            ? studentMap.get(ss.alunoId)
+            : ss.alunoId;
 
-      const ssToUpsert = [];
-      for (const ss of studentStickers) {
-        if (!ss?.week) continue;
+        return {
+          student_id: resolvedStudentId,
+          week: ss.week,
+          liberada: ss.liberada === true,
+          is_falta: ss.isFalta === true,
+          revelada: ss.revelada === true
+        };
+      })
+      .filter(x => typeof x.student_id === 'string' && x.student_id.length > 20); // bem provável ser UUID
 
-        // Tenta achar o ID do aluno pelo login ou ID enviado
-        let realStudentId = ss.alunoId;
-        
-        // Mapeamento direto e simples: prioriza o ID que já é UUID, senão busca pelo login
-        if (ss.alunoId && ss.alunoId.length > 30) { 
-           realStudentId = ss.alunoId; // Provavelmente já é o UUID do banco afn
-        } else {
-           const studentObj = students.find(s => s.login === ss.alunoId || s.id === ss.alunoId);
-           if (studentObj) realStudentId = studentObj.id;
-        }
-
-        if (realStudentId) {
-          // Simplificação máxima para garantir o salvamento no banco afn
-          ssToUpsert.push({
-            student_id: realStudentId,
-            week: ss.week,
-            liberada: ss.liberada === true,
-            is_falta: ss.isFalta === true,
-            revelada: ss.revelada === true
-          });
-        }
-           if (ssToUpsert.length > 0) {
-        const CHUNK_SIZE = 50;
-        for (let i = 0; i < ssToUpsert.length; i += CHUNK_SIZE) {
-          const chunk = ssToUpsert.slice(i, i + CHUNK_SIZE);
-          console.log(`Upserting chunk of ${chunk.length} stickers...`);
-          const { error: ssError } = await supabase
-            .from('student_stickers')
-            .upsert(chunk, { onConflict: 'student_id, week' });
-          
-          if (ssError) {
-            console.error('Erro no upsert de student_stickers:', ssError);
-            throw new Error(`Erro ao salvar figurinhas: ${ssError.message}`);
-          }
-        }
+    if (ssToUpsert.length > 0) {
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < ssToUpsert.length; i += CHUNK_SIZE) {
+        const chunk = ssToUpsert.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase
+          .from('student_stickers')
+          .upsert(chunk, { onConflict: 'student_id,week' });
+        if (error) throw new Error(`student_stickers: ${error.message}`);
       }
     }
 
