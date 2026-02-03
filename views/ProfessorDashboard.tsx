@@ -1,4 +1,3 @@
-// src/views/ProfessorDashboard.tsx
 import React, { useState, useMemo } from 'react';
 import { AppData, User, UserRole } from '../types';
 import {
@@ -28,25 +27,14 @@ interface ProfessorDashboardProps {
 }
 
 const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, updateData, onUpdateProfile }) => {
-  const [activeTab, setActiveTab] = useState<'students' | 'grid' | 'classification'>('grid');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'classification'>('attendance');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
-  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
-
-  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
-  const [editingStudentForm, setEditingStudentForm] = useState({
-    name: '',
-    login: '',
-    password: '',
-    serie: '',
-    ciclo: 'Anos Iniciais' as User['ciclo']
-  });
-
-  // Estado para cadastro em massa
-  const [bulkSerie, setBulkSerie] = useState('');
-  const [bulkCiclo, setBulkCiclo] = useState<User['ciclo']>('Anos Iniciais');
   const [bulkStudents, setBulkStudents] = useState([{ name: '', login: '', password: '' }]);
-
-  // filtros e ordenação da CLASSIFICAÇÃO
+  const [bulkSerie, setBulkSerie] = useState('');
+  const [bulkCiclo, setBulkCiclo] = useState<'Anos Iniciais' | 'Anos Finais' | 'Ensino Médio'>('Anos Iniciais');
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [editingStudentForm, setEditingStudentForm] = useState<Partial<User>>({});
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [filterCiclo, setFilterCiclo] = useState<string>('Todos');
   const [filterSerie, setFilterSerie] = useState<string>('');
   const [sortOrder, setSortOrder] = useState<'presenca' | 'falta'>('falta');
@@ -138,13 +126,11 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         // Estado: Vermelho -> Nada
         newStickers.splice(existingIndex, 1);
       } else {
-        // Fallback: se estiver liberada mas por algum motivo isFalta for false (ex: aluno liberou)
-        // Remove para poder marcar de novo
+        // Fallback
         newStickers.splice(existingIndex, 1);
       }
     }
 
-    // Chamamos updateData que já faz a atualização otimista do estado no App.tsx
     updateData({ studentStickers: newStickers });
   };
 
@@ -159,9 +145,9 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         };
       })
       .filter(s => {
-        const matchCiclo = filterCiclo === 'Todos' || s.ciclo === filterCiclo;
-        const matchSerie = !filterSerie || (s.serie || '').toLowerCase().includes(filterSerie.toLowerCase());
-        return matchCiclo && matchSerie;
+        if (filterCiclo !== 'Todos' && s.ciclo !== filterCiclo) return false;
+        if (filterSerie && !s.serie?.toLowerCase().includes(filterSerie.toLowerCase())) return false;
+        return true;
       })
       .sort((a, b) => {
         const valA = sortOrder === 'presenca' ? a.presencas : a.faltas;
@@ -171,81 +157,59 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
   }, [myStudents, data.studentStickers, filterCiclo, filterSerie, sortOrder, sortDirection]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
-      <div className="bg-white rounded-[3rem] p-8 md:p-10 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] flex flex-col items-center gap-4">
-        <div onClick={() => setIsAvatarPickerOpen(true)} className="relative group cursor-pointer">
-          <div className="w-40 h-40 bg-slate-100 rounded-full border-[6px] border-indigo-950 shadow-xl overflow-hidden relative transition-transform group-hover:scale-105 active:scale-95">
-            {getAvatarUrl(user) ? (
-              <img src={getAvatarUrl(user)!} className="w-full h-full object-cover" alt="avatar" />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-indigo-200">
-                <UserCircle size={64} />
-              </div>
-            )}
-          </div>
-          <div className="absolute -bottom-2 -right-2 bg-yellow-400 p-3 rounded-2xl border-4 border-indigo-950 shadow-lg group-hover:rotate-0 transition-all">
-            <Star size={20} className="text-indigo-950" fill="currentColor" />
-          </div>
+    <div className="space-y-8 pb-12 animate-in fade-in duration-500">
+      {/* Header com Tabs */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex bg-white/20 p-2 rounded-[2rem] border-4 border-indigo-950 shadow-lg">
+          <button
+            onClick={() => setActiveTab('attendance')}
+            className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] font-black uppercase italic tracking-tighter transition-all ${
+              activeTab === 'attendance' ? 'bg-white text-indigo-950 shadow-md scale-105' : 'text-white hover:bg-white/10'
+            }`}
+          >
+            <LayoutGrid size={20} /> Painel de Presença
+          </button>
+          <button
+            onClick={() => setActiveTab('classification')}
+            className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] font-black uppercase italic tracking-tighter transition-all ${
+              activeTab === 'classification' ? 'bg-white text-indigo-950 shadow-md scale-105' : 'text-white hover:bg-white/10'
+            }`}
+          >
+            <BarChart3 size={20} /> Classificação
+          </button>
         </div>
 
-        <div className="text-center">
-          <h2 className="text-5xl font-black italic uppercase tracking-tighter leading-none text-indigo-950">
-            Prof. {user.name}
-          </h2>
-          <div className="flex justify-center mt-4">
-            <div className="bg-emerald-400 px-8 py-3 rounded-full text-[12px] font-black uppercase tracking-widest text-indigo-950 border-4 border-indigo-950 shadow-[0_4px_0_0_rgba(30,27,75,1)]">
-              {myStudents.length} ALUNOS NA TURMA
+        <button
+          onClick={() => setIsAddingStudent(true)}
+          className="bg-yellow-400 hover:bg-yellow-500 text-indigo-950 px-8 py-4 rounded-[2rem] font-black uppercase italic tracking-tighter border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] flex items-center justify-center gap-3 active:translate-y-1 active:shadow-none transition-all"
+        >
+          <Plus size={20} strokeWidth={4} /> Cadastrar Alunos
+        </button>
+      </div>
+
+      {activeTab === 'attendance' && (
+        <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">Frequência da Turma</h2>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-green-500 border-2 border-indigo-950"></div>
+                <span className="text-[10px] font-black uppercase text-indigo-950/50">Presença</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-indigo-950"></div>
+                <span className="text-[10px] font-black uppercase text-indigo-950/50">Falta</span>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="flex bg-indigo-950 p-2 rounded-[2.5rem] gap-2 border-4 border-white/20 shadow-xl flex-wrap">
-        <button
-          onClick={() => setActiveTab('grid')}
-          className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${
-            activeTab === 'grid' ? 'bg-indigo-600 text-white shadow-lg border-2 border-white/20' : 'text-indigo-300 hover:bg-white/5'
-          }`}
-        >
-          <LayoutGrid size={18} /> Painel de Presença
-        </button>
-        <button
-          onClick={() => setActiveTab('classification')}
-          className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${
-            activeTab === 'classification' ? 'bg-orange-500 text-white shadow-lg border-2 border-white/20' : 'text-indigo-300 hover:bg-white/5'
-          }`}
-        >
-          <BarChart3 size={18} /> Classificação
-        </button>
-        <button
-          onClick={() => setActiveTab('students')}
-          className={`flex-1 min-w-[150px] flex items-center justify-center gap-3 py-5 rounded-[2rem] transition-all font-black text-xs uppercase tracking-widest ${
-            activeTab === 'students' ? 'bg-indigo-600 text-white shadow-lg border-2 border-white/20' : 'text-indigo-300 hover:bg-white/5'
-          }`}
-        >
-          <UsersIcon size={18} /> Gerenciar Alunos
-        </button>
-      </div>
-
-      {activeTab === 'grid' && (
-        <div className="bg-white rounded-[3rem] p-4 md:p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-          <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950 mb-8 border-b-4 border-indigo-50 pb-4">
-            Frequência da Turma
-          </h2>
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-separate border-spacing-0">
+          <div className="overflow-x-auto pb-4 custom-scrollbar">
+            <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="py-6 px-4 sticky left-0 bg-white z-30 border-b-4 border-indigo-50 min-w-[180px] max-w-[220px] text-[12px] font-black uppercase text-indigo-900 italic tracking-widest">
-                    Estudante
-                  </th>
+                  <th className="py-4 px-4 text-left text-[10px] font-black uppercase tracking-widest text-indigo-400 border-b-2 border-slate-50 sticky left-0 bg-white z-30">Estudante</th>
                   {Array.from({ length: 45 }, (_, i) => i + 1).map(w => (
-                    <th
-                      key={w}
-                      className={`py-6 px-2 border-b-4 border-indigo-50 text-center min-w-[60px] text-[11px] font-black ${
-                        w === data.currentWeek ? 'bg-yellow-100 text-indigo-900 shadow-inner' : 'text-slate-300'
-                      }`}
-                    >
+                    <th key={w} className={`py-4 px-2 text-center text-[10px] font-black uppercase tracking-widest border-b-2 border-slate-50 min-w-[50px] ${w === data.currentWeek ? 'text-indigo-950 bg-yellow-400/20 rounded-t-xl' : 'text-indigo-200'}`}>
                       S{w}
                     </th>
                   ))}
@@ -253,7 +217,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
               </thead>
               <tbody>
                 {myStudents.map(student => (
-                  <tr key={student.id} className="group">
+                  <tr key={student.id} className="group hover:bg-slate-50/50 transition-colors">
                     <td className="py-5 px-4 font-black text-indigo-950 sticky left-0 bg-white z-20 border-b-2 border-slate-50 border-r-2 uppercase italic text-[13px] tracking-tighter truncate">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg border-2 border-indigo-950 overflow-hidden bg-slate-100 flex-shrink-0">
@@ -330,132 +294,89 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
             <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
               <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Série</label>
               <input
+                placeholder="Ex: 6º Ano"
                 value={filterSerie}
                 onChange={(e) => setFilterSerie(e.target.value)}
-                placeholder="Ex: 9A, 1A..."
                 className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white"
               />
             </div>
 
             <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
-              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Ordenar por</label>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Ordenar Por</label>
               <select
                 value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value as any)}
+                onChange={(e) => setSortOrder(e.target.value as 'presenca' | 'falta')}
                 className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white"
               >
-                <option value="falta">Mais faltas</option>
                 <option value="presenca">Mais presenças</option>
+                <option value="falta">Mais faltas</option>
               </select>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
-              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Ordem</label>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Direção</label>
               <button
-                onClick={() => setSortDirection(prev => (prev === 'desc' ? 'asc' : 'desc'))}
-                className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white flex items-center justify-center gap-2"
+                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                className="w-full p-3 rounded-xl border-2 border-indigo-950 font-black text-indigo-950 bg-white flex items-center justify-between"
               >
-                {sortDirection === 'desc' ? <ArrowDownAZ size={16} /> : <ArrowUpAZ size={16} />}
-                {sortDirection === 'desc' ? 'Maior → Menor' : 'Menor → Maior'}
+                {sortDirection === 'asc' ? 'Crescente' : 'Decrescente'}
+                {sortDirection === 'asc' ? <ArrowUpAZ size={16} /> : <ArrowDownAZ size={16} />}
               </button>
             </div>
           </div>
 
-          <div className="space-y-4">
-            {classificationData.length === 0 ? (
-              <div className="py-10 text-center text-slate-300 font-black uppercase tracking-widest italic">
-                Nenhum aluno encontrado com esses filtros.
-              </div>
-            ) : (
-              classificationData.map((s, idx) => (
-                <div key={s.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
-                  <div className="w-10 h-10 bg-indigo-950 text-white rounded-full flex items-center justify-center font-black italic">
-                    {idx + 1}º
-                  </div>
-
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-12 h-12 rounded-2xl border-4 border-indigo-950 overflow-hidden bg-white">
-                      {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" alt="avatar" /> : <UserCircle className="text-slate-200" />}
-                    </div>
-
-                    <div className="flex-1">
-                      <p className="font-black text-indigo-950 uppercase italic">{s.name}</p>
-                      <p className="text-[9px] font-black text-indigo-400 uppercase">{s.serie} • {s.ciclo}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-6">
-                    <div className="text-center">
-                      <p className="text-[8px] font-black text-green-500 uppercase">Presenças</p>
-                      <p className="text-2xl font-black text-indigo-950">{s.presencas}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-[8px] font-black text-red-500 uppercase">Faltas</p>
-                      <p className="text-2xl font-black text-indigo-950">{s.faltas}</p>
-                    </div>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {classificationData.map((s, idx) => (
+              <div key={s.id} className="bg-white rounded-[2.5rem] p-6 border-4 border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] relative group hover:-translate-y-1 transition-all">
+                <div className="absolute -top-4 -left-4 w-12 h-12 bg-indigo-950 text-white rounded-2xl flex items-center justify-center font-black italic text-xl shadow-lg border-4 border-white rotate-[-12deg] group-hover:rotate-0 transition-all">
+                  #{idx + 1}
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
 
-      {activeTab === 'students' && (
-        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
-          <button
-            onClick={() => setIsAddingStudent(true)}
-            className="w-full py-8 bg-green-500 hover:bg-green-600 text-white rounded-[2.5rem] font-black text-2xl shadow-xl flex items-center justify-center gap-4 uppercase italic transition-all active:scale-95 border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)]"
-          >
-            <Plus size={32} strokeWidth={4} /> Novo Aluno
-          </button>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            {myStudents.map(s => (
-              <div
-                key={s.id}
-                className="bg-white text-indigo-950 p-8 rounded-[3rem] border-[8px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] flex flex-col gap-4 group transition-all hover:-translate-y-1"
-              >
-                <div className="flex justify-between items-start gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl border-4 border-indigo-950 overflow-hidden bg-slate-100">
-                      {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" alt="avatar" /> : <UserCircle size={32} className="text-slate-300 m-auto mt-3" />}
-                    </div>
-                    <div>
-                      <p className="font-black text-2xl uppercase italic tracking-tighter">{s.name}</p>
-                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{s.serie} • {s.ciclo}</p>
-                    </div>
+                <div className="flex items-center gap-4 mb-6 mt-2">
+                  <div className="w-16 h-16 rounded-2xl border-4 border-indigo-950 overflow-hidden bg-slate-100 shadow-md">
+                    {getAvatarUrl(s) ? (
+                      <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" alt="avatar" />
+                    ) : (
+                      <UserCircle className="w-full h-full text-slate-300" />
+                    )}
                   </div>
-
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => {
-                        setEditingStudentId(s.id);
-                        setEditingStudentForm({
-                          name: s.name,
-                          login: s.login,
-                          password: s.password || '',
-                          serie: s.serie || '',
-                          ciclo: s.ciclo || 'Anos Iniciais'
-                        });
-                      }}
-                      className="bg-blue-100 p-3 rounded-2xl text-blue-600 hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-200"
-                    >
-                      <Edit2 size={20} strokeWidth={3} />
-                    </button>
-
-                    <button
-                      onClick={() => updateData({ students: data.students.filter(x => x.id !== s.id) })}
-                      className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
-                    >
-                      <Trash2 size={20} strokeWidth={3} />
-                    </button>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-black text-xl text-indigo-950 uppercase italic tracking-tighter truncate leading-none mb-1">{s.name}</h3>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400">{s.serie} | {s.ciclo}</p>
                   </div>
                 </div>
 
-                <div className="bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-100 flex justify-between items-center">
-                  <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Acesso:</span>
-                  <span className="font-black text-indigo-600 text-xs">{s.login} / {s.password}</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-green-50 p-4 rounded-2xl border-2 border-green-100 text-center">
+                    <p className="text-[8px] font-black text-green-500 uppercase">Presenças</p>
+                    <p className="text-2xl font-black text-indigo-950">{s.presencas}</p>
+                  </div>
+                  <div className="bg-red-50 p-4 rounded-2xl border-2 border-red-100 text-center">
+                    <p className="text-[8px] font-black text-red-500 uppercase">Faltas</p>
+                    <p className="text-2xl font-black text-indigo-950">{s.faltas}</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingStudentId(s.id);
+                      setEditingStudentForm(s);
+                    }}
+                    className="flex-1 py-4 bg-indigo-50 text-indigo-600 rounded-2xl font-black border-2 border-indigo-100 uppercase text-[10px] hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Edit2 size={14} /> Editar
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Tem certeza que deseja excluir ${s.name}?`)) {
+                        updateData({ students: data.students.filter(std => std.id !== s.id) });
+                      }
+                    }}
+                    className="bg-red-100 p-4 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
             ))}
@@ -463,33 +384,34 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         </div>
       )}
 
+      {/* Modal Cadastro em Massa */}
       {isAddingStudent && (
-        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsAddingStudent(false)}>
-          <div className="bg-white text-indigo-950 w-full max-w-2xl rounded-[4rem] p-10 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300 my-auto" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-indigo-950/90 backdrop-blur-xl z-[2000] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl p-8 md:p-12 shadow-2xl relative border-[8px] border-indigo-950 my-8 animate-in zoom-in duration-300">
             <button onClick={() => setIsAddingStudent(false)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all">
               <X size={24} strokeWidth={4} />
             </button>
-            <h3 className="text-4xl font-black mb-8 text-center italic uppercase tracking-tighter">Novo Aluno</h3>
-            
+
+            <h2 className="text-4xl font-black italic uppercase tracking-tighter text-indigo-950 mb-8 text-center">Novos Guerreiros</h2>
+
             <form onSubmit={handleAddBulkStudents} className="space-y-8">
-              {/* Dados da Sala (Série e Ciclo) */}
-              <div className="grid grid-cols-2 gap-6 bg-indigo-50 p-6 rounded-[2.5rem] border-4 border-indigo-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Série/Sala</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Série / Turma</label>
                   <input
                     required
-                    placeholder="Ex: 9ºA"
+                    placeholder="Ex: 6º Ano A"
                     value={bulkSerie}
                     onChange={e => setBulkSerie(e.target.value)}
-                    className="w-full p-4 bg-white rounded-2xl outline-none border-4 border-indigo-950 font-black text-indigo-950"
+                    className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950 focus:bg-white transition-all"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Ciclo</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Ciclo de Ensino</label>
                   <select
                     value={bulkCiclo}
                     onChange={e => setBulkCiclo(e.target.value as any)}
-                    className="w-full p-4 bg-white rounded-2xl outline-none border-4 border-indigo-950 font-black text-indigo-950"
+                    className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950 focus:bg-white transition-all"
                   >
                     <option value="Anos Iniciais">Anos Iniciais</option>
                     <option value="Anos Finais">Anos Finais</option>
@@ -498,68 +420,60 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                 </div>
               </div>
 
-              {/* Lista de Alunos */}
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                 {bulkStudents.map((s, idx) => (
-                  <div key={idx} className="p-6 bg-slate-50 rounded-[2rem] border-4 border-slate-200 relative group">
+                  <div key={idx} className="flex flex-col md:flex-row gap-4 p-6 bg-slate-50 rounded-[2rem] border-2 border-slate-100 relative group">
+                    <div className="flex-1 space-y-2">
+                      <input
+                        placeholder="Nome do Aluno"
+                        value={s.name}
+                        onChange={e => updateBulkStudent(idx, 'name', e.target.value)}
+                        className="w-full p-4 bg-white rounded-2xl border-2 border-indigo-950/10 outline-none font-black text-indigo-950 focus:border-indigo-950 transition-all"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <input
+                        placeholder="Login"
+                        value={s.login}
+                        onChange={e => updateBulkStudent(idx, 'login', e.target.value)}
+                        className="w-full p-4 bg-white rounded-2xl border-2 border-indigo-950/10 outline-none font-black text-indigo-950 focus:border-indigo-950 transition-all"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <input
+                        type="password"
+                        placeholder="Senha"
+                        value={s.password}
+                        onChange={e => updateBulkStudent(idx, 'password', e.target.value)}
+                        className="w-full p-4 bg-white rounded-2xl border-2 border-indigo-950/10 outline-none font-black text-indigo-950 focus:border-indigo-950 transition-all"
+                      />
+                    </div>
                     {bulkStudents.length > 1 && (
-                      <button 
+                      <button
                         type="button"
                         onClick={() => removeStudentField(idx)}
                         className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-xl border-2 border-indigo-950 shadow-md opacity-0 group-hover:opacity-100 transition-all"
                       >
-                        <Minus size={16} strokeWidth={4} />
+                        <Minus size={14} strokeWidth={4} />
                       </button>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Nome</label>
-                        <input
-                          required
-                          placeholder="Nome do Aluno"
-                          value={s.name}
-                          onChange={e => updateBulkStudent(idx, 'name', e.target.value)}
-                          className="w-full p-3 bg-white rounded-xl outline-none border-2 border-indigo-950 font-black text-indigo-950"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Login</label>
-                        <input
-                          required
-                          placeholder="Login"
-                          value={s.login}
-                          onChange={e => updateBulkStudent(idx, 'login', e.target.value)}
-                          className="w-full p-3 bg-white rounded-xl outline-none border-2 border-indigo-950 font-black text-indigo-950"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Senha</label>
-                        <input
-                          required
-                          placeholder="Senha"
-                          value={s.password}
-                          onChange={e => updateBulkStudent(idx, 'password', e.target.value)}
-                          className="w-full p-3 bg-white rounded-xl outline-none border-2 border-indigo-950 font-black text-indigo-950"
-                        />
-                      </div>
-                    </div>
                   </div>
                 ))}
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
                 <button
                   type="button"
                   onClick={addStudentField}
-                  className="flex-1 py-5 bg-indigo-100 text-indigo-600 font-black rounded-2xl border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] flex items-center justify-center gap-2 uppercase text-xs hover:bg-indigo-200 transition-all"
+                  className="flex-1 py-5 bg-white text-indigo-950 font-black rounded-2xl border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,0.1)] uppercase text-xs hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                 >
-                  <Plus size={20} strokeWidth={4} /> Adicionar outro aluno
+                  <Plus size={16} strokeWidth={4} /> Mais um Aluno
                 </button>
                 <button
                   type="submit"
                   className="flex-[2] py-5 bg-green-500 text-white font-black rounded-2xl border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] uppercase text-xs hover:bg-green-600 transition-all"
                 >
-                  Cadastrar todos os alunos
+                  Finalizar Cadastro
                 </button>
               </div>
             </form>
@@ -567,73 +481,62 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         </div>
       )}
 
+      {/* Modal Editar Aluno */}
       {editingStudentId && (
-        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4" onClick={() => setEditingStudentId(null)}>
-          <div className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-indigo-950/90 backdrop-blur-xl z-[2000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[3rem] w-full max-w-md p-10 shadow-2xl relative border-[8px] border-indigo-950 animate-in zoom-in duration-300">
             <button onClick={() => setEditingStudentId(null)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all">
               <X size={24} strokeWidth={4} />
             </button>
-            <h3 className="text-4xl font-black mb-10 text-center italic uppercase tracking-tighter">Editar Aluno</h3>
+
+            <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950 mb-8 text-center">Editar Aluno</h2>
+
             <form onSubmit={handleEditStudent} className="space-y-6">
-              <input
-                required
-                placeholder="Nome do Aluno"
-                value={editingStudentForm.name}
-                onChange={e => setEditingStudentForm({ ...editingStudentForm, name: e.target.value })}
-                className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
-              />
-              <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Nome Completo</label>
                 <input
                   required
-                  placeholder="Login"
-                  value={editingStudentForm.login}
+                  value={editingStudentForm.name || ''}
+                  onChange={e => setEditingStudentForm({ ...editingStudentForm, name: e.target.value })}
+                  className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Login de Acesso</label>
+                <input
+                  required
+                  value={editingStudentForm.login || ''}
                   onChange={e => setEditingStudentForm({ ...editingStudentForm, login: e.target.value })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
+                  className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Nova Senha (opcional)</label>
                 <input
-                  required
-                  placeholder="Senha"
-                  value={editingStudentForm.password}
+                  value={editingStudentForm.password || ''}
                   onChange={e => setEditingStudentForm({ ...editingStudentForm, password: e.target.value })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
+                  className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Série / Turma</label>
                 <input
                   required
-                  placeholder="Série"
-                  value={editingStudentForm.serie}
+                  value={editingStudentForm.serie || ''}
                   onChange={e => setEditingStudentForm({ ...editingStudentForm, serie: e.target.value })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
+                  className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950"
                 />
-                <select
-                  value={editingStudentForm.ciclo}
-                  onChange={e => setEditingStudentForm({ ...editingStudentForm, ciclo: e.target.value as any })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
-                >
-                  <option value="Anos Iniciais">Anos Iniciais</option>
-                  <option value="Anos Finais">Anos Finais</option>
-                  <option value="Ensino Médio">Ensino Médio</option>
-                </select>
               </div>
-              <button type="submit" className="w-full py-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-[2.5rem] shadow-[0_12px_0_0_rgba(30,27,75,1)] transform active:scale-95 active:translate-y-1 active:shadow-none transition-all text-2xl uppercase italic tracking-tighter border-[8px] border-indigo-950">
+
+              <button
+                type="submit"
+                className="w-full py-6 bg-indigo-600 text-white font-black rounded-[2rem] border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] uppercase italic tracking-tighter text-xl hover:bg-indigo-700 active:translate-y-1 active:shadow-none transition-all"
+              >
                 Salvar Alterações
               </button>
             </form>
           </div>
         </div>
-      )}
-
-      {isAvatarPickerOpen && (
-        <AvatarPickerModal
-          currentAvatarSeed={user.avatarSeed}
-          currentAvatarUrl={user.avatarUrl}
-          onSelect={(updates) => {
-            if (onUpdateProfile) onUpdateProfile(updates);
-            setIsAvatarPickerOpen(false);
-          }}
-          onClose={() => setIsAvatarPickerOpen(false)}
-        />
       )}
     </div>
   );

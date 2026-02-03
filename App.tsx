@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   const isBusyRef = useRef(false);
+  const pendingUpdateRef = useRef<AppData | null>(null);
 
   const performSync = useCallback(async (showLoader = false) => {
     if (isBusyRef.current) return;
@@ -38,49 +39,45 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [performSync]);
 
-  const dataRef = useRef<AppData>(data);
-  useEffect(() => {
-    dataRef.current = data;
-  }, [data]);
-
   const updateData = async (newData: Partial<AppData>) => {
-    const updatedData = { ...dataRef.current, ...newData };
-
-    // Otimista: mostra na tela imediatamente para feedback instantâneo
+    // 1. Calcular o novo estado imediatamente
+    const updatedData = { ...data, ...newData };
+    
+    // 2. Atualizar a UI imediatamente (Otimista)
     setData(updatedData);
 
-    // Se já estiver salvando, não iniciamos outro processo de salvamento concorrente agora.
-    // O próximo ciclo ou o final do ciclo atual deve lidar com isso.
-    if (isBusyRef.current) return;
+    // 3. Gerenciar a fila de salvamento
+    if (isBusyRef.current) {
+      // Se já estiver salvando, apenas atualizamos o que precisa ser salvo na próxima rodada
+      pendingUpdateRef.current = updatedData;
+      return;
+    }
 
     isBusyRef.current = true;
     setIsSaving(true);
 
-    const trySave = async (retries = 3): Promise<boolean> => {
+    const trySave = async (dataToSave: AppData) => {
       try {
-        // Salva sempre o que está no Ref, que é o estado mais atualizado (incluindo cliques rápidos)
-        await saveData(dataRef.current);
-        return true;
-      } catch (e) {
-        if (retries > 0) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return trySave(retries - 1);
+        await saveData(dataToSave);
+        
+        // Se houver atualizações pendentes que chegaram enquanto salvávamos
+        if (pendingUpdateRef.current) {
+          const nextData = pendingUpdateRef.current;
+          pendingUpdateRef.current = null;
+          await trySave(nextData);
         }
-        throw e;
+      } catch (e) {
+        console.error('Erro ao salvar dados:', e);
+        // Em caso de erro crítico, tenta sincronizar para não perder o estado do servidor
+        performSync(true);
       }
     };
 
     try {
-      await trySave();
-    } catch (e) {
-      console.error('Erro persistente ao salvar:', e);
+      await trySave(updatedData);
     } finally {
       isBusyRef.current = false;
       setIsSaving(false);
-      
-      // Se após terminar o salvamento, o dado no Ref for diferente do que acabamos de salvar,
-      // significa que houve cliques durante o processo de salvamento.
-      // Poderíamos disparar outro salvamento aqui se necessário.
     }
   };
 
