@@ -35,6 +35,7 @@ export default async function handler(req, res) {
 
     const currentWeek = eSet ? 1 : (settings?.current_week || 1);
 
+    // sempre monta as 45 semanas (mesmo se não existir linha no banco)
     const stickersMap = new Map();
     (stickersRows || []).forEach(s => stickersMap.set(s.week, s));
 
