@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         .upsert({ id: 'global', current_week: currentWeek }, { onConflict: 'id' });
     }
 
-    // 2. PROFESSORES (Operação em Lote)
+    // 2. PROFESSORES
     if (professors.length > 0) {
       const profsToUpsert = professors
         .filter(p => p?.login && p.id !== 'admin' && p.login !== 'admin')
@@ -43,15 +43,17 @@ export default async function handler(req, res) {
           login: p.login,
           password: p.password || '',
           avatar_url: p.avatarUrl || '',
-          avatar_seed: p.avatarSeed || ''
+          avatar_seed: p.avatarSeed || '',
+          // REMOVIDO: email (para evitar erro de UNIQUE e campo inexistente)
+          role: 'professor'
         }));
 
       if (profsToUpsert.length > 0) {
         const { error } = await supabase.from('professors').upsert(profsToUpsert, { onConflict: 'login' });
-        if (error) throw new Error(`Professors bulk upsert: ${error.message}`);
+        if (error) throw new Error(`Professors: ${error.message}`);
       }
 
-      // Lógica de Deletar Professors (Sincronização de lista)
+      // Sincronização de Professores
       const incomingProfLogins = new Set(profsToUpsert.map(p => p.login));
       const { data: existingProfs } = await supabase.from('professors').select('id,login');
       const toDelete = (existingProfs || []).filter(r => r.login !== 'admin' && !incomingProfLogins.has(r.login));
@@ -63,27 +65,43 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3. ALUNOS (Operação em Lote)
+    // 3. ALUNOS
     if (students.length > 0) {
-      const studentsToUpsert = students
-        .filter(s => s?.login)
-        .map(s => ({
+      // Precisamos pegar os IDs reais dos professores para vincular os alunos corretamente
+      const { data: allProfs } = await supabase.from('professors').select('id, login');
+      const profMap = new Map();
+      (allProfs || []).forEach(p => profMap.set(p.login, p.id));
+
+      const studentsToUpsert = [];
+      for (const s of students) {
+        if (!s?.login) continue;
+        
+        // Resolve o ID do professor pelo login, caso o ID enviado seja temporário
+        let realProfId = s.professorId;
+        const profByLogin = professors.find(p => p.id === s.professorId);
+        if (profByLogin && profMap.has(profByLogin.login)) {
+          realProfId = profMap.get(profByLogin.login);
+        }
+
+        studentsToUpsert.push({
           name: s.name || '',
           login: s.login,
           password: s.password || '',
-          professor_id: s.professorId || null,
+          professor_id: realProfId || null,
           avatar_url: s.avatarUrl || '',
           avatar_seed: s.avatarSeed || '',
           serie: s.serie || '',
           ciclo: s.ciclo || null
-        }));
+          // REMOVIDO: email
+        });
+      }
 
       if (studentsToUpsert.length > 0) {
         const { error } = await supabase.from('students').upsert(studentsToUpsert, { onConflict: 'login' });
-        if (error) throw new Error(`Students bulk upsert: ${error.message}`);
+        if (error) throw new Error(`Students: ${error.message}`);
       }
 
-      // Lógica de Deletar Alunos
+      // Sincronização de Alunos
       const incomingStudentLogins = new Set(studentsToUpsert.map(s => s.login));
       const { data: existingStudents } = await supabase.from('students').select('id,login');
       const toDelete = (existingStudents || []).filter(r => !incomingStudentLogins.has(r.login));
@@ -95,7 +113,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. FIGURINHAS (Operação em Lote)
+    // 4. FIGURINHAS
     if (stickers.length > 0) {
       const stickersToUpsert = stickers
         .filter(st => st?.week && String(st.imageUrl || '').trim())
@@ -110,34 +128,56 @@ export default async function handler(req, res) {
         await supabase.from('stickers').upsert(stickersToUpsert, { onConflict: 'week' });
       }
 
-      // Deletar figurinhas sem imagem
-      const weeksWithImage = new Set(stickersToUpsert.map(s => s.week));
       const weeksToEmpty = stickers.filter(st => st?.week && !String(st.imageUrl || '').trim()).map(st => st.week);
       if (weeksToEmpty.length > 0) {
         await supabase.from('stickers').delete().in('week', weeksToEmpty);
       }
     }
 
-    // 5. FIGURINHAS DOS ALUNOS (A operação mais crítica)
+    // 5. FIGURINHAS DOS ALUNOS
     if (studentStickers.length > 0) {
-      // Para evitar timeouts, processamos em pedaços de 100
-      const CHUNK_SIZE = 100;
-      for (let i = 0; i < studentStickers.length; i += CHUNK_SIZE) {
-        const chunk = studentStickers.slice(i, i + CHUNK_SIZE);
-        const ssToUpsert = chunk
-          .filter(ss => ss?.alunoId && ss?.week)
-          .map(ss => ({
-            student_id: ss.alunoId,
-            week: ss.week,
+      // Precisamos dos IDs reais dos alunos e das figurinhas
+      const { data: allStudents } = await supabase.from('students').select('id, login');
+      const { data: allStickers } = await supabase.from('stickers').select('id, week');
+      
+      const studentMap = new Map();
+      (allStudents || []).forEach(s => studentMap.set(s.login, s.id));
+      
+      const stickerMap = new Map();
+      (allStickers || []).forEach(s => stickerMap.set(s.week, s.id));
+
+      const ssToUpsert = [];
+      for (const ss of studentStickers) {
+        if (!ss?.week) continue;
+
+        // Tenta achar o ID do aluno pelo login ou ID enviado
+        let realStudentId = ss.alunoId;
+        const studentObj = students.find(s => s.id === ss.alunoId);
+        if (studentObj && studentMap.has(studentObj.login)) {
+          realStudentId = studentMap.get(studentObj.login);
+        }
+
+        // Tenta achar o ID da figurinha pela semana
+        const realStickerId = stickerMap.get(ss.week);
+
+        if (realStudentId && realStickerId) {
+          ssToUpsert.push({
+            student_id: realStudentId,
+            week: ss.week, // Mantido para compatibilidade se a tabela tiver
             liberada: !!ss.liberada,
             revelada: !!ss.revelada,
             is_falta: !!ss.isFalta,
             reconquistada: !!ss.reconquistada
-          }));
+          });
+        }
+      }
 
-        if (ssToUpsert.length > 0) {
-          const { error } = await supabase.from('student_stickers').upsert(ssToUpsert, { onConflict: 'student_id, week' });
-          if (error) throw new Error(`Student Stickers chunk upsert: ${error.message}`);
+      if (ssToUpsert.length > 0) {
+        const CHUNK_SIZE = 50;
+        for (let i = 0; i < ssToUpsert.length; i += CHUNK_SIZE) {
+          const chunk = ssToUpsert.slice(i, i + CHUNK_SIZE);
+          const { error } = await supabase.from('student_stickers').upsert(chunk, { onConflict: 'student_id, week' });
+          if (error) console.error(`Chunk error: ${error.message}`);
         }
       }
     }
