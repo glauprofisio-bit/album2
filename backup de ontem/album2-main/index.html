@@ -1,0 +1,108 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Álbun de Figurinhas - PEI Dr. Disnei</title>
+    <meta name="theme-color" content="#6d28d9">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Fredoka', 'Nunito', sans-serif;
+        background-color: #6d28d9; /* Indigo-700 / Purple base */
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        overflow-x: hidden;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        height: 6px;
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+      }
+      
+      @keyframes reveal-pop {
+        0% { transform: scale(0.8) rotate(-5deg); filter: brightness(2); }
+        50% { transform: scale(1.1) rotate(5deg); filter: brightness(1.2); }
+        100% { transform: scale(1) rotate(0); filter: brightness(1); }
+      }
+      .animate-reveal-pop {
+        animation: reveal-pop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      }
+
+      @keyframes rainbow-text {
+        0% { color: #ffeb3b; text-shadow: 0 0 15px rgba(255, 235, 59, 0.6); }
+        25% { color: #4caf50; text-shadow: 0 0 15px rgba(76, 175, 80, 0.6); }
+        50% { color: #2196f3; text-shadow: 0 0 15px rgba(33, 150, 243, 0.6); }
+        75% { color: #e91e63; text-shadow: 0 0 15px rgba(233, 30, 99, 0.6); }
+        100% { color: #ffeb3b; text-shadow: 0 0 15px rgba(255, 235, 59, 0.6); }
+      }
+      .animate-rainbow {
+        animation: rainbow-text 2s linear infinite;
+      }
+
+      @keyframes glow-pulse {
+        0%, 100% { opacity: 0.4; transform: scale(1); filter: blur(40px); }
+        50% { opacity: 0.7; transform: scale(1.1); filter: blur(60px); }
+      }
+      .animate-glow-pulse {
+        animation: glow-pulse 4s ease-in-out infinite;
+      }
+
+      @keyframes sparkle {
+        0%, 100% { transform: scale(0) rotate(0deg); opacity: 0; filter: brightness(2); }
+        50% { transform: scale(1.2) rotate(180deg); opacity: 1; filter: brightness(1.5); }
+      }
+      .animate-sparkle {
+        animation: sparkle 2s ease-in-out infinite;
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0) rotate(0); }
+        50% { transform: translateY(-15px) rotate(3deg); }
+      }
+      .animate-float {
+        animation: float 4s ease-in-out infinite;
+      }
+
+      @keyframes club-shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+      .club-card-shimmer::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+        animation: club-shimmer 3s infinite;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "canvas-confetti": "https://esm.sh/canvas-confetti@^1.9.4",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="min-h-screen text-white">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,564 @@
+import React, { useState, useMemo } from 'react';
+import { AppData, User, UserRole } from '../types';
+import {
+  CheckCircle,
+  Plus,
+  LayoutGrid,
+  Users as UsersIcon,
+  UserCircle,
+  Star,
+  XCircle,
+  BarChart3,
+  Edit2,
+  Trash2,
+  X,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  Filter,
+  Minus
+} from 'lucide-react';
+import AvatarPickerModal from './AvatarPickerModal';
+
+interface ProfessorDashboardProps {
+  user: User;
+  data: AppData;
+  updateData: (newData: Partial<AppData>) => void;
+  onUpdateProfile?: (updates: Partial<User>) => void;
+}
+
+const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, updateData, onUpdateProfile }) => {
+  const [activeTab, setActiveTab] = useState<'attendance' | 'classification'>('attendance');
+  const [isAddingStudent, setIsAddingStudent] = useState(false);
+  const [bulkStudents, setBulkStudents] = useState([{ name: '', login: '', password: '' }]);
+  const [bulkSerie, setBulkSerie] = useState('');
+  const [bulkCiclo, setBulkCiclo] = useState<'Anos Iniciais' | 'Anos Finais' | 'Ensino Médio'>('Anos Iniciais');
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [editingStudentForm, setEditingStudentForm] = useState<Partial<User>>({});
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
+  const [filterCiclo, setFilterCiclo] = useState<string>('Todos');
+  const [filterSerie, setFilterSerie] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'presenca' | 'falta'>('falta');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const myStudents = useMemo(() => data.students.filter(s => s.professorId === user.id), [data.students, user.id]);
+
+  const getAvatarUrl = (u: User) => {
+    if (u.avatarUrl) return u.avatarUrl;
+    if (u.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
+    return null;
+  };
+
+  const handleAddBulkStudents = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const newStudents: User[] = bulkStudents
+      .filter(s => s.name && s.login)
+      .map(s => ({
+        id: Math.random().toString(36).substr(2, 9),
+        name: s.name,
+        email: '',
+        login: s.login,
+        password: s.password,
+        serie: bulkSerie,
+        ciclo: bulkCiclo,
+        role: UserRole.ALUNO,
+        professorId: user.id
+      }));
+
+    if (newStudents.length === 0) return;
+
+    updateData({ students: [...data.students, ...newStudents] });
+    
+    // Reset
+    setBulkStudents([{ name: '', login: '', password: '' }]);
+    setBulkSerie('');
+    setIsAddingStudent(false);
+  };
+
+  const addStudentField = () => {
+    setBulkStudents([...bulkStudents, { name: '', login: '', password: '' }]);
+  };
+
+  const removeStudentField = (index: number) => {
+    if (bulkStudents.length > 1) {
+      const next = [...bulkStudents];
+      next.splice(index, 1);
+      setBulkStudents(next);
+    }
+  };
+
+  const updateBulkStudent = (index: number, field: string, value: string) => {
+    const next = [...bulkStudents];
+    next[index] = { ...next[index], [field]: value };
+    setBulkStudents(next);
+  };
+
+  const handleEditStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingStudentId) {
+      const updatedStudents = data.students.map(s => (s.id === editingStudentId ? { ...s, ...editingStudentForm } : s));
+      updateData({ students: updatedStudents });
+      setEditingStudentId(null);
+    }
+  };
+
+  const handleDeleteStudent = async (studentId: string) => {
+    if (!confirm('Deseja realmente excluir este aluno?')) return;
+    
+    // Filtra localmente primeiro para resposta rápida
+    const updatedStudents = data.students.filter(s => s.id !== studentId);
+    await updateData({ students: updatedStudents });
+    
+    // A função updateData agora já cuida do salvamento direto no Supabase
+  };
+
+  const toggleSticker = (alunoId: string, week: number) => {
+    const existingIndex = data.studentStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
+    let newStickers = [...data.studentStickers];
+
+    if (existingIndex === -1) {
+      // Estado: Nada -> Verde (Presença)
+      newStickers.push({
+        alunoId,
+        week,
+        liberada: true,
+        revelada: false,
+        reconquistada: false,
+        isFalta: false,
+        date: new Date().toISOString()
+      });
+    } else {
+      const sticker = newStickers[existingIndex];
+      if (sticker.liberada && !sticker.isFalta) {
+        // Estado: Verde -> Vermelho (Falta)
+        newStickers[existingIndex] = { ...sticker, liberada: false, isFalta: true };
+      } else if (sticker.isFalta) {
+        // Estado: Vermelho -> Nada
+        newStickers.splice(existingIndex, 1);
+      } else {
+        // Fallback
+        newStickers.splice(existingIndex, 1);
+      }
+    }
+
+    updateData({ studentStickers: newStickers });
+  };
+
+  const classificationData = useMemo(() => {
+    return myStudents
+      .map(student => {
+        const stickers = data.studentStickers.filter(s => s.alunoId === student.id);
+        return {
+          ...student,
+          presencas: stickers.filter(s => s.liberada && !s.isFalta).length,
+          faltas: stickers.filter(s => s.isFalta).length
+        };
+      })
+      .filter(s => {
+        if (filterCiclo !== 'Todos' && s.ciclo !== filterCiclo) return false;
+        if (filterSerie && !s.serie?.toLowerCase().includes(filterSerie.toLowerCase())) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const valA = sortOrder === 'presenca' ? a.presencas : a.faltas;
+        const valB = sortOrder === 'presenca' ? b.presencas : b.faltas;
+        return sortDirection === 'desc' ? valB - valA : valA - valB;
+      });
+  }, [myStudents, data.studentStickers, filterCiclo, filterSerie, sortOrder, sortDirection]);
+
+  return (
+    <div className="space-y-8 pb-12 animate-in fade-in duration-500">
+      {/* Header com Tabs */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex bg-white/20 p-2 rounded-[2rem] border-4 border-indigo-950 shadow-lg">
+          <button
+            onClick={() => setActiveTab('attendance')}
+            className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] font-black uppercase italic tracking-tighter transition-all ${
+              activeTab === 'attendance' ? 'bg-white text-indigo-950 shadow-md scale-105' : 'text-white hover:bg-white/10'
+            }`}
+          >
+            <LayoutGrid size={20} /> Painel de Presença
+          </button>
+          <button
+            onClick={() => setActiveTab('classification')}
+            className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] font-black uppercase italic tracking-tighter transition-all ${
+              activeTab === 'classification' ? 'bg-white text-indigo-950 shadow-md scale-105' : 'text-white hover:bg-white/10'
+            }`}
+          >
+            <BarChart3 size={20} /> Classificação
+          </button>
+        </div>
+
+        <button
+          onClick={() => setIsAddingStudent(true)}
+          className="bg-yellow-400 hover:bg-yellow-500 text-indigo-950 px-8 py-4 rounded-[2rem] font-black uppercase italic tracking-tighter border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] flex items-center justify-center gap-3 active:translate-y-1 active:shadow-none transition-all"
+        >
+          <Plus size={20} strokeWidth={4} /> Cadastrar Alunos
+        </button>
+      </div>
+
+      {activeTab === 'attendance' && (
+        <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">Frequência da Turma</h2>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-green-500 border-2 border-indigo-950"></div>
+                <span className="text-[10px] font-black uppercase text-indigo-950/50">Presença</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-indigo-950"></div>
+                <span className="text-[10px] font-black uppercase text-indigo-950/50">Falta</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto pb-4 custom-scrollbar">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="py-4 px-4 text-left text-[10px] font-black uppercase tracking-widest text-indigo-400 border-b-2 border-slate-50 sticky left-0 bg-white z-30">Estudante</th>
+                  {Array.from({ length: 45 }, (_, i) => i + 1).map(w => (
+                    <th key={w} className={`py-4 px-2 text-center text-[10px] font-black uppercase tracking-widest border-b-2 border-slate-50 min-w-[50px] ${w === data.currentWeek ? 'text-indigo-950 bg-yellow-400/20 rounded-t-xl' : 'text-indigo-200'}`}>
+                      S{w}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {myStudents.map(student => (
+                  <tr key={student.id} className="group hover:bg-slate-50/50 transition-colors">
+                    <td className="py-5 px-4 font-black text-indigo-950 sticky left-0 bg-white z-20 border-b-2 border-slate-50 border-r-2 uppercase italic text-[13px] tracking-tighter truncate">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg border-2 border-indigo-950 overflow-hidden bg-slate-100 flex-shrink-0">
+                          {getAvatarUrl(student) ? (
+                            <img src={getAvatarUrl(student)!} className="w-full h-full object-cover" alt="avatar" />
+                          ) : (
+                            <UserCircle className="text-slate-300" />
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="truncate">{student.name}</span>
+                          <span className="text-[7px] text-indigo-400 leading-none">
+                            {student.serie} | {student.ciclo}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    {Array.from({ length: 45 }, (_, i) => i + 1).map(w => {
+                      const sticker = data.studentStickers.find(s => s.alunoId === student.id && s.week === w);
+                      const isVerde = sticker?.liberada && !sticker?.isFalta;
+                      const isVermelho = sticker?.isFalta;
+                      return (
+                        <td key={w} className={`py-4 px-1 border-b-2 border-slate-50 text-center ${w === data.currentWeek ? 'bg-yellow-50/20' : ''}`}>
+                          <button
+                            onClick={() => toggleSticker(student.id, w)}
+                            className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center transition-all active:scale-90 border-4 ${
+                              isVerde
+                                ? 'bg-green-500 border-indigo-950 text-white shadow-lg'
+                                : isVermelho
+                                ? 'bg-red-500 border-indigo-950 text-white shadow-lg'
+                                : 'bg-slate-50 border-slate-200 text-slate-200 hover:border-indigo-400 hover:text-indigo-400'
+                            }`}
+                          >
+                            {isVerde ? <CheckCircle size={20} strokeWidth={4} /> : isVermelho ? <XCircle size={20} strokeWidth={4} /> : <div className="w-2 h-2 rounded-full bg-current" />}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'classification' && (
+        <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+            <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">Classificação da Turma</h2>
+
+            <div className="flex items-center gap-2 bg-indigo-950/5 px-4 py-3 rounded-[1.5rem] border-2 border-indigo-950/10">
+              <Filter size={16} className="text-indigo-950" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-950/70">Filtros</span>
+            </div>
+          </div>
+
+          {/* Controles */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Ciclo</label>
+              <select
+                value={filterCiclo}
+                onChange={(e) => setFilterCiclo(e.target.value)}
+                className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Anos Iniciais">Anos Iniciais</option>
+                <option value="Anos Finais">Anos Finais</option>
+                <option value="Ensino Médio">Ensino Médio</option>
+              </select>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Série</label>
+              <input
+                placeholder="Ex: 6º Ano"
+                value={filterSerie}
+                onChange={(e) => setFilterSerie(e.target.value)}
+                className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white"
+              />
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Ordenar Por</label>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as 'presenca' | 'falta')}
+                className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white"
+              >
+                <option value="presenca">Mais presenças</option>
+                <option value="falta">Mais faltas</option>
+              </select>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Direção</label>
+              <button
+                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                className="w-full p-3 rounded-xl border-2 border-indigo-950 font-black text-indigo-950 bg-white flex items-center justify-between"
+              >
+                {sortDirection === 'asc' ? 'Crescente' : 'Decrescente'}
+                {sortDirection === 'asc' ? <ArrowUpAZ size={16} /> : <ArrowDownAZ size={16} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {classificationData.map((s, idx) => (
+              <div key={s.id} className="bg-white rounded-[2.5rem] p-6 border-4 border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] relative group hover:-translate-y-1 transition-all">
+                <div className="absolute -top-4 -left-4 w-12 h-12 bg-indigo-950 text-white rounded-2xl flex items-center justify-center font-black italic text-xl shadow-lg border-4 border-white rotate-[-12deg] group-hover:rotate-0 transition-all">
+                  #{idx + 1}
+                </div>
+
+                <div className="flex items-center gap-4 mb-6 mt-2">
+                  <div className="w-16 h-16 rounded-2xl border-4 border-indigo-950 overflow-hidden bg-slate-100 shadow-md">
+                    {getAvatarUrl(s) ? (
+                      <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" alt="avatar" />
+                    ) : (
+                      <UserCircle className="w-full h-full text-slate-300" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-black text-xl text-indigo-950 uppercase italic tracking-tighter truncate leading-none mb-1">{s.name}</h3>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400">{s.serie} | {s.ciclo}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-green-50 p-4 rounded-2xl border-2 border-green-100 text-center">
+                    <p className="text-[8px] font-black text-green-500 uppercase">Presenças</p>
+                    <p className="text-2xl font-black text-indigo-950">{s.presencas}</p>
+                  </div>
+                  <div className="bg-red-50 p-4 rounded-2xl border-2 border-red-100 text-center">
+                    <p className="text-[8px] font-black text-red-500 uppercase">Faltas</p>
+                    <p className="text-2xl font-black text-indigo-950">{s.faltas}</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingStudentId(s.id);
+                      setEditingStudentForm(s);
+                    }}
+                    className="flex-1 py-4 bg-indigo-50 text-indigo-600 rounded-2xl font-black border-2 border-indigo-100 uppercase text-[10px] hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Edit2 size={14} /> Editar
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Tem certeza que deseja excluir ${s.name}?`)) {
+                        updateData({ students: data.students.filter(std => std.id !== s.id) });
+                      }
+                    }}
+                    className="bg-red-100 p-4 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cadastro em Massa */}
+      {isAddingStudent && (
+        <div className="fixed inset-0 bg-indigo-950/90 backdrop-blur-xl z-[2000] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl p-8 md:p-12 shadow-2xl relative border-[8px] border-indigo-950 my-8 animate-in zoom-in duration-300">
+            <button onClick={() => setIsAddingStudent(false)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all">
+              <X size={24} strokeWidth={4} />
+            </button>
+
+            <h2 className="text-4xl font-black italic uppercase tracking-tighter text-indigo-950 mb-8 text-center">Novos Guerreiros</h2>
+
+            <form onSubmit={handleAddBulkStudents} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Série / Turma</label>
+                  <input
+                    required
+                    placeholder="Ex: 6º Ano A"
+                    value={bulkSerie}
+                    onChange={e => setBulkSerie(e.target.value)}
+                    className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950 focus:bg-white transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Ciclo de Ensino</label>
+                  <select
+                    value={bulkCiclo}
+                    onChange={e => setBulkCiclo(e.target.value as any)}
+                    className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950 focus:bg-white transition-all"
+                  >
+                    <option value="Anos Iniciais">Anos Iniciais</option>
+                    <option value="Anos Finais">Anos Finais</option>
+                    <option value="Ensino Médio">Ensino Médio</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                {bulkStudents.map((s, idx) => (
+                  <div key={idx} className="flex flex-col md:flex-row gap-4 p-6 bg-slate-50 rounded-[2rem] border-2 border-slate-100 relative group">
+                    <div className="flex-1 space-y-2">
+                      <input
+                        placeholder="Nome do Aluno"
+                        value={s.name}
+                        onChange={e => updateBulkStudent(idx, 'name', e.target.value)}
+                        className="w-full p-4 bg-white rounded-2xl border-2 border-indigo-950/10 outline-none font-black text-indigo-950 focus:border-indigo-950 transition-all"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <input
+                        placeholder="Login"
+                        value={s.login}
+                        onChange={e => updateBulkStudent(idx, 'login', e.target.value)}
+                        className="w-full p-4 bg-white rounded-2xl border-2 border-indigo-950/10 outline-none font-black text-indigo-950 focus:border-indigo-950 transition-all"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <input
+                        type="password"
+                        placeholder="Senha"
+                        value={s.password}
+                        onChange={e => updateBulkStudent(idx, 'password', e.target.value)}
+                        className="w-full p-4 bg-white rounded-2xl border-2 border-indigo-950/10 outline-none font-black text-indigo-950 focus:border-indigo-950 transition-all"
+                      />
+                    </div>
+                    {bulkStudents.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeStudentField(idx)}
+                        className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-xl border-2 border-indigo-950 shadow-md opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Minus size={14} strokeWidth={4} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-4">
+                <button
+                  type="button"
+                  onClick={addStudentField}
+                  className="flex-1 py-5 bg-white text-indigo-950 font-black rounded-2xl border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,0.1)] uppercase text-xs hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus size={16} strokeWidth={4} /> Mais um Aluno
+                </button>
+                <button
+                  type="submit"
+                  className="flex-[2] py-5 bg-green-500 text-white font-black rounded-2xl border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] uppercase text-xs hover:bg-green-600 transition-all"
+                >
+                  Finalizar Cadastro
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Aluno */}
+      {editingStudentId && (
+        <div className="fixed inset-0 bg-indigo-950/90 backdrop-blur-xl z-[2000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[3rem] w-full max-w-md p-10 shadow-2xl relative border-[8px] border-indigo-950 animate-in zoom-in duration-300">
+            <button onClick={() => setEditingStudentId(null)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all">
+              <X size={24} strokeWidth={4} />
+            </button>
+
+            <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950 mb-8 text-center">Editar Aluno</h2>
+
+            <form onSubmit={handleEditStudent} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Nome Completo</label>
+                <input
+                  required
+                  value={editingStudentForm.name || ''}
+                  onChange={e => setEditingStudentForm({ ...editingStudentForm, name: e.target.value })}
+                  className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Login de Acesso</label>
+                <input
+                  required
+                  value={editingStudentForm.login || ''}
+                  onChange={e => setEditingStudentForm({ ...editingStudentForm, login: e.target.value })}
+                  className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Nova Senha (opcional)</label>
+                <input
+                  value={editingStudentForm.password || ''}
+                  onChange={e => setEditingStudentForm({ ...editingStudentForm, password: e.target.value })}
+                  className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Série / Turma</label>
+                <input
+                  required
+                  value={editingStudentForm.serie || ''}
+                  onChange={e => setEditingStudentForm({ ...editingStudentForm, serie: e.target.value })}
+                  className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950"
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteStudent(editingStudentId)}
+                  className="flex-1 py-6 bg-red-500 text-white font-black rounded-[2rem] border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] uppercase italic tracking-tighter text-xl hover:bg-red-600 active:translate-y-1 active:shadow-none transition-all"
+                >
+                  Excluir
+                </button>
+                <button
+                  type="submit"
+                  className="flex-[2] py-6 bg-indigo-600 text-white font-black rounded-[2rem] border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] uppercase italic tracking-tighter text-xl hover:bg-indigo-700 active:translate-y-1 active:shadow-none transition-all"
+                >
+                  Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ProfessorDashboard;
