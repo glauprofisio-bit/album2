@@ -102,6 +102,16 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     }
   };
 
+  const handleDeleteStudent = async (studentId: string) => {
+    if (!confirm('Deseja realmente excluir este aluno?')) return;
+    
+    // Filtra localmente primeiro para resposta rápida
+    const updatedStudents = data.students.filter(s => s.id !== studentId);
+    await updateData({ students: updatedStudents });
+    
+    // A função updateData agora já cuida do salvamento direto no Supabase
+  };
+
   const toggleSticker = (alunoId: string, week: number) => {
     const existingIndex = data.studentStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
     let newStickers = [...data.studentStickers];
@@ -528,12 +538,21 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                 />
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-6 bg-indigo-600 text-white font-black rounded-[2rem] border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] uppercase italic tracking-tighter text-xl hover:bg-indigo-700 active:translate-y-1 active:shadow-none transition-all"
-              >
-                Salvar Alterações
-              </button>
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteStudent(editingStudentId)}
+                  className="flex-1 py-6 bg-red-500 text-white font-black rounded-[2rem] border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] uppercase italic tracking-tighter text-xl hover:bg-red-600 active:translate-y-1 active:shadow-none transition-all"
+                >
+                  Excluir
+                </button>
+                <button
+                  type="submit"
+                  className="flex-[2] py-6 bg-indigo-600 text-white font-black rounded-[2rem] border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] uppercase italic tracking-tighter text-xl hover:bg-indigo-700 active:translate-y-1 active:shadow-none transition-all"
+                >
+                  Salvar
+                </button>
+              </div>
             </form>
           </div>
         </div>
