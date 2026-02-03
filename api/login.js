@@ -1,7 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://zcrjsvgjnbzawrnajgva.supabase.co';
-const supabaseKey = 'sb_publishable_t01dpjzy6r1Qdag45eAMvQ_dJtOBG23';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase environment variables');
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -20,8 +24,11 @@ export default async function handler(req, res) {
     }
 
     // Admin login
+    const ADMIN_LOGIN = process.env.ADMIN_LOGIN || 'Glau';
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Smart200#';
+
     if (role === 'admin') {
-      if (login === 'Glau' && password === 'Smart200#') {
+      if (login === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
         return res.status(200).json({
           success: true,
           user: {

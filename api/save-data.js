@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const url = process.env.SUPABASE_URL;
+    const url = process.env.SUPABASE_URL || 'https://zcrjsvgjnbzawrnajgva.supabase.co';
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 
     if (!url || !serviceKey) {
@@ -152,18 +152,22 @@ export default async function handler(req, res) {
 
         // Tenta achar o ID do aluno pelo login ou ID enviado
         let realStudentId = ss.alunoId;
-        const studentObj = students.find(s => s.id === ss.alunoId);
-        if (studentObj && studentMap.has(studentObj.login)) {
-          realStudentId = studentMap.get(studentObj.login);
+        
+        // Se o ID enviado não for um UUID (pode ser um ID temporário do front), tenta pelo mapa
+        if (realStudentId && !realStudentId.includes('-') && studentMap.has(realStudentId)) {
+           realStudentId = studentMap.get(realStudentId);
+        } else {
+           // Fallback: procurar nos estudantes enviados se algum tem esse ID e pegar o login para achar o ID real no banco
+           const studentObj = students.find(s => s.id === ss.alunoId);
+           if (studentObj && studentMap.has(studentObj.login)) {
+             realStudentId = studentMap.get(studentObj.login);
+           }
         }
 
-        // Tenta achar o ID da figurinha pela semana
-        const realStickerId = stickerMap.get(ss.week);
-
-        if (realStudentId && realStickerId) {
+        if (realStudentId) {
           ssToUpsert.push({
             student_id: realStudentId,
-            week: ss.week, // Mantido para compatibilidade se a tabela tiver
+            week: ss.week,
             liberada: !!ss.liberada,
             revelada: !!ss.revelada,
             is_falta: !!ss.isFalta,

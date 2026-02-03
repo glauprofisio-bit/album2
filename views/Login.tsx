@@ -18,7 +18,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
     setError('');
 
     if (selectedRole === UserRole.ADMIN) {
-      if (login === 'Glau' && password === 'Smart200#') {
+      // No frontend, o ideal é validar via API, mas mantendo a lógica atual com proteção
+      const adminLogin = import.meta.env.VITE_ADMIN_LOGIN || 'Glau';
+      const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || 'Smart200#';
+      
+      if (login === adminLogin && password === adminPass) {
         onLogin({ id: 'admin', name: 'Administrador Glau', email: 'admin@escola.com', login: 'Glau', role: UserRole.ADMIN });
         return;
       }
@@ -44,7 +48,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen relative overflow-hidden px-4 py-20">
+    <div className="flex flex-col items-center justify-center min-h-screen relative overflow-hidden px-4 py-8 md:py-12">
       {/* Background Decorativo Estilo Stickers */}
       <div className="absolute top-[10%] left-[5%] text-yellow-400 opacity-20 animate-float hidden md:block" style={{ animationDelay: '0s' }}>
         <Star size={120} fill="currentColor" />
@@ -61,35 +65,35 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
 
       <div className="w-full max-w-xl z-10">
         {/* Container Principal Estilo Card de Colecionador */}
-        <div className="bg-white rounded-[4rem] p-10 md:p-16 border-[12px] border-indigo-950 shadow-[0_20px_0_0_rgba(30,27,75,1)] relative overflow-hidden">
+        <div className="bg-white rounded-[3rem] p-8 md:p-12 border-[10px] border-indigo-950 shadow-[0_15px_0_0_rgba(30,27,75,1)] relative overflow-hidden">
           
           {/* Header da Capa */}
-          <div className="flex flex-col items-center mb-16 relative">
+          <div className="flex flex-col items-center mb-10 relative">
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-400 rounded-full border-8 border-indigo-950 flex items-center justify-center -rotate-12 shadow-xl z-20">
                <span className="font-black text-indigo-950 text-xl leading-none text-center">NOVA<br/>EDIÇÃO</span>
             </div>
 
-            <div className="bg-indigo-600 px-10 py-6 rounded-[2.5rem] border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] -rotate-2 transform hover:rotate-0 transition-transform duration-300">
-               <h1 className="text-4xl md:text-5xl font-black text-center leading-none tracking-tighter uppercase italic text-white drop-shadow-md">
-                 ÁLBUM DE<br/>FIGURINHAS
-               </h1>
-            </div>
-            
-            <div className="mt-8 text-center space-y-1">
-               <p className="text-indigo-950 font-black text-lg uppercase tracking-widest italic">PEI Dr. Disnei</p>
-               <div className="bg-pink-100 px-4 py-1 rounded-full border-2 border-pink-200 inline-block">
-                 <p className="text-[10px] text-pink-600 font-black uppercase tracking-widest italic">"Cada semana é uma nova conquista!"</p>
-               </div>
-            </div>
+            <div className="bg-indigo-600 px-8 py-4 rounded-[2rem] border-[6px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] -rotate-2 transform hover:rotate-0 transition-transform duration-300">
+	               <h1 className="text-3xl md:text-4xl font-black text-center leading-none tracking-tighter uppercase italic text-white drop-shadow-md">
+	                 ÁLBUM DE<br/>FIGURINHAS
+	               </h1>
+	            </div>
+	            
+	            <div className="mt-6 text-center space-y-3">
+	               <p className="text-indigo-600 font-black text-2xl uppercase tracking-tighter italic">@peidisnei</p>
+	               <div className="bg-gradient-to-r from-pink-500 to-purple-500 px-6 py-2 rounded-full border-4 border-indigo-950 shadow-lg transform rotate-1">
+	                 <p className="text-sm md:text-base text-white font-black uppercase tracking-tight italic drop-shadow-sm">"Cada semana é uma nova conquista!"</p>
+	               </div>
+	            </div>
           </div>
 
           {!selectedRole ? (
             <div className="grid gap-6">
-              <p className="text-center font-black text-indigo-950 uppercase tracking-widest text-xs mb-4 opacity-50 italic">Quem vai colecionar hoje?</p>
+              <p className="text-center font-black text-indigo-950 uppercase tracking-widest text-sm mb-2 italic">Quem vai colecionar hoje?</p>
               
               <button 
                 onClick={() => setSelectedRole(UserRole.ALUNO)}
-                className="group relative flex items-center justify-between bg-orange-400 hover:bg-orange-500 p-8 rounded-[2.5rem] border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] hover:translate-y-1 hover:shadow-[0_5px_0_0_rgba(30,27,75,1)] transition-all active:scale-95 -rotate-1"
+                className="group relative flex items-center justify-between bg-orange-400 hover:bg-orange-500 p-6 rounded-[2rem] border-[6px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] hover:translate-y-1 hover:shadow-[0_4px_0_0_rgba(30,27,75,1)] transition-all active:scale-95 -rotate-1"
               >
                 <div className="flex items-center gap-6">
                   <div className="bg-white p-4 rounded-2xl border-4 border-indigo-950 shadow-md">
@@ -105,7 +109,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
 
               <button 
                 onClick={() => setSelectedRole(UserRole.PROFESSOR)}
-                className="group relative flex items-center justify-between bg-emerald-400 hover:bg-emerald-500 p-8 rounded-[2.5rem] border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] hover:translate-y-1 hover:shadow-[0_5px_0_0_rgba(30,27,75,1)] transition-all active:scale-95 rotate-1"
+                className="group relative flex items-center justify-between bg-emerald-400 hover:bg-emerald-500 p-6 rounded-[2rem] border-[6px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] hover:translate-y-1 hover:shadow-[0_4px_0_0_rgba(30,27,75,1)] transition-all active:scale-95 rotate-1"
               >
                 <div className="flex items-center gap-6">
                   <div className="bg-white p-4 rounded-2xl border-4 border-indigo-950 shadow-md">
@@ -121,7 +125,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
 
               <button 
                 onClick={() => setSelectedRole(UserRole.ADMIN)}
-                className="group relative flex items-center justify-between bg-indigo-500 hover:bg-indigo-600 p-8 rounded-[2.5rem] border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] hover:translate-y-1 hover:shadow-[0_5px_0_0_rgba(30,27,75,1)] transition-all active:scale-95 -rotate-1"
+                className="group relative flex items-center justify-between bg-indigo-500 hover:bg-indigo-600 p-6 rounded-[2rem] border-[6px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] hover:translate-y-1 hover:shadow-[0_4px_0_0_rgba(30,27,75,1)] transition-all active:scale-95 -rotate-1"
               >
                 <div className="flex items-center gap-6">
                   <div className="bg-white p-4 rounded-2xl border-4 border-indigo-950 shadow-md">
