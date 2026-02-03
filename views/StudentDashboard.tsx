@@ -63,6 +63,17 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
 
   const isUnstoppable = currentStreak >= 4;
 
+  const tutor = useMemo(() => {
+    if (!user.professorId) return null;
+    return data.professors.find(p => p.id === user.professorId);
+  }, [data.professors, user.professorId]);
+
+  const getTutorAvatarUrl = (t: User) => {
+    if (t.avatarUrl) return t.avatarUrl;
+    if (t.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${t.avatarSeed}`;
+    return null;
+  };
+
   const getRarityStyle = (r: StickerRarity = StickerRarity.NORMAL) => {
     switch (r) {
       case StickerRarity.RUBY:
@@ -499,6 +510,22 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
               </div>
             )}
           </div>
+
+          {tutor && (
+            <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-[2rem] border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] w-fit">
+              <div className="w-12 h-12 rounded-full border-4 border-indigo-950 overflow-hidden bg-white shadow-md">
+                {getTutorAvatarUrl(tutor) ? (
+                  <img src={getTutorAvatarUrl(tutor)!} className="w-full h-full object-cover" alt="tutor" />
+                ) : (
+                  <UserCircle className="w-full h-full text-slate-300" />
+                )}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400 leading-none mb-1">Tutor</span>
+                <span className="text-lg font-black text-indigo-950 uppercase italic leading-none">{tutor.name}</span>
+              </div>
+            </div>
+          )}
 
           <div className="w-full bg-slate-100 h-6 rounded-full border-4 border-indigo-950 p-1 overflow-hidden">
             <div

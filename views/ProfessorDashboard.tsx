@@ -115,10 +115,11 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
   };
 
   const toggleSticker = (alunoId: string, week: number) => {
+    const existingIndex = data.studentStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
     let newStickers = [...data.studentStickers];
-    const existingIndex = newStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
 
     if (existingIndex === -1) {
+      // Estado: Nada -> Verde (Presença)
       newStickers.push({
         alunoId,
         week,
@@ -130,15 +131,21 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
       });
     } else {
       const sticker = newStickers[existingIndex];
-
-      // regra: professor só marca falta, ou remove a marcação
       if (sticker.liberada && !sticker.isFalta) {
+        // Estado: Verde -> Vermelho (Falta)
         newStickers[existingIndex] = { ...sticker, liberada: false, isFalta: true };
+      } else if (sticker.isFalta) {
+        // Estado: Vermelho -> Nada
+        newStickers.splice(existingIndex, 1);
       } else {
+        // Fallback: se estiver liberada mas por algum motivo isFalta for false (ex: aluno liberou)
+        // Remove para poder marcar de novo
         newStickers.splice(existingIndex, 1);
       }
     }
 
+    // Atualização local imediata para feedback instantâneo
+    data.studentStickers = newStickers;
     updateData({ studentStickers: newStickers });
   };
 
