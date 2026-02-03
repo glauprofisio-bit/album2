@@ -19,7 +19,13 @@ export default async function handler(req, res) {
 
     const supabase = createClient(url, serviceKey);
 
-    const { professors = [], students = [], stickers = [], studentStickers = [], currentWeek } = req.body || {};
+    const {
+      professors = [],
+      students = [],
+      stickers = [],
+      studentStickers = [],
+      currentWeek
+    } = req.body || {};
 
     // current week
     if (currentWeek !== undefined && currentWeek !== null) {
@@ -29,10 +35,13 @@ export default async function handler(req, res) {
       if (error) throw new Error(`app_settings upsert: ${error.message}`);
     }
 
-    // professors upsert + delete
+    // =========================
+    // PROFESSORS (UPSERT)
+    // =========================
     const incomingProfLogins = new Set();
+
     for (const p of professors) {
-      if (!p?.login) continue;
+      if (!p?.login) continue; // não salva professor em branco
       if (p.id === 'admin' || p.login === 'admin') continue;
 
       incomingProfLogins.add(p.login);
@@ -47,27 +56,46 @@ export default async function handler(req, res) {
         },
         { onConflict: 'login' }
       );
+
       if (error) throw new Error(`professors upsert ${p.login}: ${error.message}`);
     }
 
-    {
-      const { data: existingProfs, error } = await supabase.from('professors').select('login');
+    // =========================
+    // PROFESSORS (DELETE SAFE)
+    // só tenta deletar se a lista de professores veio "de verdade"
+    // =========================
+    if (Array.isArray(professors) && professors.length > 0) {
+      const { data: existingProfs, error } = await supabase.from('professors').select('id,login');
       if (error) throw new Error(`professors select: ${error.message}`);
 
       const toDelete = (existingProfs || [])
-        .map(r => r.login)
-        .filter(l => l && l !== 'admin' && !incomingProfLogins.has(l));
+        .filter(r => r.login && r.login !== 'admin' && !incomingProfLogins.has(r.login));
 
       if (toDelete.length) {
-        const { error: delErr } = await supabase.from('professors').delete().in('login', toDelete);
+        const idsToDelete = toDelete.map(x => x.id);
+
+        // solta alunos desses professores (evita FK)
+        const { error: nullErr } = await supabase
+          .from('students')
+          .update({ professor_id: null })
+          .in('professor_id', idsToDelete);
+
+        if (nullErr) throw new Error(`students set null professor_id: ${nullErr.message}`);
+
+        const loginsToDelete = toDelete.map(x => x.login);
+
+        const { error: delErr } = await supabase.from('professors').delete().in('login', loginsToDelete);
         if (delErr) throw new Error(`professors delete: ${delErr.message}`);
       }
     }
 
-    // students upsert + delete
+    // =========================
+    // STUDENTS (UPSERT)
+    // =========================
     const incomingStudentLogins = new Set();
+
     for (const s of students) {
-      if (!s?.login) continue;
+      if (!s?.login) continue; // não salva aluno em branco
 
       incomingStudentLogins.add(s.login);
 
@@ -84,24 +112,41 @@ export default async function handler(req, res) {
         },
         { onConflict: 'login' }
       );
+
       if (error) throw new Error(`students upsert ${s.login}: ${error.message}`);
     }
 
-    {
-      const { data: existingStudents, error } = await supabase.from('students').select('login');
+    // =========================
+    // STUDENTS (DELETE SAFE)
+    // só tenta deletar se a lista de alunos veio "de verdade"
+    // =========================
+    if (Array.isArray(students) && students.length > 0) {
+      const { data: existingStudents, error } = await supabase.from('students').select('id,login');
       if (error) throw new Error(`students select: ${error.message}`);
 
       const toDelete = (existingStudents || [])
-        .map(r => r.login)
-        .filter(l => l && !incomingStudentLogins.has(l));
+        .filter(r => r.login && !incomingStudentLogins.has(r.login));
 
       if (toDelete.length) {
-        const { error: delErr } = await supabase.from('students').delete().in('login', toDelete);
+        const idsToDelete = toDelete.map(x => x.id);
+        const loginsToDelete = toDelete.map(x => x.login);
+
+        // apaga student_stickers antes (evita FK)
+        const { error: ssDelErr } = await supabase
+          .from('student_stickers')
+          .delete()
+          .in('student_id', idsToDelete);
+
+        if (ssDelErr) throw new Error(`student_stickers delete: ${ssDelErr.message}`);
+
+        const { error: delErr } = await supabase.from('students').delete().in('login', loginsToDelete);
         if (delErr) throw new Error(`students delete: ${delErr.message}`);
       }
     }
 
-    // stickers (delete if empty image)
+    // =========================
+    // STICKERS
+    // =========================
     for (const st of stickers) {
       if (!st?.week) continue;
 
@@ -114,13 +159,21 @@ export default async function handler(req, res) {
       }
 
       const { error } = await supabase.from('stickers').upsert(
-        { week: st.week, name: st.name || `Semana ${st.week}`, image_url: imageUrl, rarity: st.rarity || 'NORMAL' },
+        {
+          week: st.week,
+          name: st.name || `Semana ${st.week}`,
+          image_url: imageUrl,
+          rarity: st.rarity || 'NORMAL'
+        },
         { onConflict: 'week' }
       );
+
       if (error) throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
     }
 
-    // student_stickers
+    // =========================
+    // STUDENT_STICKERS
+    // =========================
     for (const ss of studentStickers) {
       if (!ss?.week) continue;
 
@@ -131,7 +184,11 @@ export default async function handler(req, res) {
       } else {
         const login = ss.alunoLogin || ss.alunoId;
         if (login) {
-          const { data: st, error } = await supabase.from('students').select('id').eq('login', login).single();
+          const { data: st, error } = await supabase
+            .from('students')
+            .select('id')
+            .eq('login', login)
+            .single();
           if (!error && st?.id) studentId = st.id;
         }
       }
@@ -149,6 +206,7 @@ export default async function handler(req, res) {
         },
         { onConflict: 'student_id, week' }
       );
+
       if (error) throw new Error(`student_stickers upsert ${studentId}/${ss.week}: ${error.message}`);
     }
 
