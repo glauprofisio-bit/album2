@@ -15,7 +15,8 @@ import {
   X,
   ArrowDownAZ,
   ArrowUpAZ,
-  Filter
+  Filter,
+  Minus
 } from 'lucide-react';
 import AvatarPickerModal from './AvatarPickerModal';
 
@@ -40,13 +41,10 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     ciclo: 'Anos Iniciais' as User['ciclo']
   });
 
-  const [studentForm, setStudentForm] = useState({
-    name: '',
-    login: '',
-    password: '',
-    serie: '',
-    ciclo: 'Anos Iniciais' as User['ciclo']
-  });
+  // Estado para cadastro em massa
+  const [bulkSerie, setBulkSerie] = useState('');
+  const [bulkCiclo, setBulkCiclo] = useState<User['ciclo']>('Anos Iniciais');
+  const [bulkStudents, setBulkStudents] = useState([{ name: '', login: '', password: '' }]);
 
   // filtros e ordenação da CLASSIFICAÇÃO
   const [filterCiclo, setFilterCiclo] = useState<string>('Todos');
@@ -62,22 +60,49 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     return null;
   };
 
-  const handleAddStudent = (e: React.FormEvent) => {
+  const handleAddBulkStudents = (e: React.FormEvent) => {
     e.preventDefault();
-    const newStudent: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: studentForm.name,
-      email: '',
-      login: studentForm.login,
-      password: studentForm.password,
-      serie: studentForm.serie,
-      ciclo: studentForm.ciclo,
-      role: UserRole.ALUNO,
-      professorId: user.id
-    };
-    updateData({ students: [...data.students, newStudent] });
-    setStudentForm({ name: '', login: '', password: '', serie: '', ciclo: 'Anos Iniciais' });
+    
+    const newStudents: User[] = bulkStudents
+      .filter(s => s.name && s.login)
+      .map(s => ({
+        id: Math.random().toString(36).substr(2, 9),
+        name: s.name,
+        email: '',
+        login: s.login,
+        password: s.password,
+        serie: bulkSerie,
+        ciclo: bulkCiclo,
+        role: UserRole.ALUNO,
+        professorId: user.id
+      }));
+
+    if (newStudents.length === 0) return;
+
+    updateData({ students: [...data.students, ...newStudents] });
+    
+    // Reset
+    setBulkStudents([{ name: '', login: '', password: '' }]);
+    setBulkSerie('');
     setIsAddingStudent(false);
+  };
+
+  const addStudentField = () => {
+    setBulkStudents([...bulkStudents, { name: '', login: '', password: '' }]);
+  };
+
+  const removeStudentField = (index: number) => {
+    if (bulkStudents.length > 1) {
+      const next = [...bulkStudents];
+      next.splice(index, 1);
+      setBulkStudents(next);
+    }
+  };
+
+  const updateBulkStudent = (index: number, field: string, value: string) => {
+    const next = [...bulkStudents];
+    next[index] = { ...next[index], [field]: value };
+    setBulkStudents(next);
   };
 
   const handleEditStudent = (e: React.FormEvent) => {
@@ -145,7 +170,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         <div onClick={() => setIsAvatarPickerOpen(true)} className="relative group cursor-pointer">
           <div className="w-40 h-40 bg-slate-100 rounded-full border-[6px] border-indigo-950 shadow-xl overflow-hidden relative transition-transform group-hover:scale-105 active:scale-95">
             {getAvatarUrl(user) ? (
-              <img src={getAvatarUrl(user)!} className="w-full h-full object-cover" />
+              <img src={getAvatarUrl(user)!} className="w-full h-full object-cover" alt="avatar" />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-indigo-200">
                 <UserCircle size={64} />
@@ -227,7 +252,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg border-2 border-indigo-950 overflow-hidden bg-slate-100 flex-shrink-0">
                           {getAvatarUrl(student) ? (
-                            <img src={getAvatarUrl(student)!} className="w-full h-full object-cover" />
+                            <img src={getAvatarUrl(student)!} className="w-full h-full object-cover" alt="avatar" />
                           ) : (
                             <UserCircle className="text-slate-300" />
                           )}
@@ -240,7 +265,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                         </div>
                       </div>
                     </td>
-
                     {Array.from({ length: 45 }, (_, i) => i + 1).map(w => {
                       const sticker = data.studentStickers.find(s => s.alunoId === student.id && s.week === w);
                       const isVerde = sticker?.liberada && !sticker?.isFalta;
@@ -345,7 +369,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
                   <div className="flex items-center gap-4 flex-1">
                     <div className="w-12 h-12 rounded-2xl border-4 border-indigo-950 overflow-hidden bg-white">
-                      {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" /> : <UserCircle className="text-slate-200" />}
+                      {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" alt="avatar" /> : <UserCircle className="text-slate-200" />}
                     </div>
 
                     <div className="flex-1">
@@ -389,7 +413,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-2xl border-4 border-indigo-950 overflow-hidden bg-slate-100">
-                      {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" /> : <UserCircle size={32} className="text-slate-300 m-auto mt-3" />}
+                      {getAvatarUrl(s) ? <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" alt="avatar" /> : <UserCircle size={32} className="text-slate-300 m-auto mt-3" />}
                     </div>
                     <div>
                       <p className="font-black text-2xl uppercase italic tracking-tighter">{s.name}</p>
@@ -417,7 +441,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                     <button
                       onClick={() => updateData({ students: data.students.filter(x => x.id !== s.id) })}
                       className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
-                      title="Deleção está ligada ao seu save. Se você quiser deleção definitiva no banco, a gente cria um endpoint depois."
                     >
                       <Trash2 size={20} strokeWidth={3} />
                     </button>
@@ -435,60 +458,104 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
       )}
 
       {isAddingStudent && (
-        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4" onClick={() => setIsAddingStudent(false)}>
-          <div className="bg-white text-indigo-950 w-full max-w-lg rounded-[4rem] p-12 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[1000] flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsAddingStudent(false)}>
+          <div className="bg-white text-indigo-950 w-full max-w-2xl rounded-[4rem] p-10 shadow-2xl relative border-[12px] border-indigo-950 animate-in zoom-in duration-300 my-auto" onClick={e => e.stopPropagation()}>
             <button onClick={() => setIsAddingStudent(false)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl transition-all">
               <X size={24} strokeWidth={4} />
             </button>
-            <h3 className="text-4xl font-black mb-10 text-center italic uppercase tracking-tighter">Novo Aluno</h3>
-            <form onSubmit={handleAddStudent} className="space-y-6">
-              <input
-                required
-                placeholder="Nome do Aluno"
-                value={studentForm.name}
-                onChange={e => setStudentForm({ ...studentForm, name: e.target.value })}
-                className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
-              />
-              <div className="grid grid-cols-2 gap-6">
-                <input
-                  required
-                  placeholder="Login"
-                  value={studentForm.login}
-                  onChange={e => setStudentForm({ ...studentForm, login: e.target.value })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
-                />
-                <input
-                  required
-                  placeholder="Senha"
-                  value={studentForm.password}
-                  onChange={e => setStudentForm({ ...studentForm, password: e.target.value })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
-                />
+            <h3 className="text-4xl font-black mb-8 text-center italic uppercase tracking-tighter">Novo Aluno</h3>
+            
+            <form onSubmit={handleAddBulkStudents} className="space-y-8">
+              {/* Dados da Sala (Série e Ciclo) */}
+              <div className="grid grid-cols-2 gap-6 bg-indigo-50 p-6 rounded-[2.5rem] border-4 border-indigo-100">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Série/Sala</label>
+                  <input
+                    required
+                    placeholder="Ex: 9ºA"
+                    value={bulkSerie}
+                    onChange={e => setBulkSerie(e.target.value)}
+                    className="w-full p-4 bg-white rounded-2xl outline-none border-4 border-indigo-950 font-black text-indigo-950"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Ciclo</label>
+                  <select
+                    value={bulkCiclo}
+                    onChange={e => setBulkCiclo(e.target.value as any)}
+                    className="w-full p-4 bg-white rounded-2xl outline-none border-4 border-indigo-950 font-black text-indigo-950"
+                  >
+                    <option value="Anos Iniciais">Anos Iniciais</option>
+                    <option value="Anos Finais">Anos Finais</option>
+                    <option value="Ensino Médio">Ensino Médio</option>
+                  </select>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-6">
-                <input
-                  required
-                  placeholder="Série (ex: 1A)"
-                  value={studentForm.serie}
-                  onChange={e => setStudentForm({ ...studentForm, serie: e.target.value })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
-                />
-                <select
-                  value={studentForm.ciclo}
-                  onChange={e => setStudentForm({ ...studentForm, ciclo: e.target.value as any })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+
+              {/* Lista de Alunos */}
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {bulkStudents.map((s, idx) => (
+                  <div key={idx} className="p-6 bg-slate-50 rounded-[2rem] border-4 border-slate-200 relative group">
+                    {bulkStudents.length > 1 && (
+                      <button 
+                        type="button"
+                        onClick={() => removeStudentField(idx)}
+                        className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-xl border-2 border-indigo-950 shadow-md opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Minus size={16} strokeWidth={4} />
+                      </button>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Nome</label>
+                        <input
+                          required
+                          placeholder="Nome do Aluno"
+                          value={s.name}
+                          onChange={e => updateBulkStudent(idx, 'name', e.target.value)}
+                          className="w-full p-3 bg-white rounded-xl outline-none border-2 border-indigo-950 font-black text-indigo-950"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Login</label>
+                        <input
+                          required
+                          placeholder="Login"
+                          value={s.login}
+                          onChange={e => updateBulkStudent(idx, 'login', e.target.value)}
+                          className="w-full p-3 bg-white rounded-xl outline-none border-2 border-indigo-950 font-black text-indigo-950"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Senha</label>
+                        <input
+                          required
+                          placeholder="Senha"
+                          value={s.password}
+                          onChange={e => updateBulkStudent(idx, 'password', e.target.value)}
+                          className="w-full p-3 bg-white rounded-xl outline-none border-2 border-indigo-950 font-black text-indigo-950"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={addStudentField}
+                  className="flex-1 py-5 bg-indigo-100 text-indigo-600 font-black rounded-2xl border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] flex items-center justify-center gap-2 uppercase text-xs hover:bg-indigo-200 transition-all"
                 >
-                  <option value="Anos Iniciais">Anos Iniciais</option>
-                  <option value="Anos Finais">Anos Finais</option>
-                  <option value="Ensino Médio">Ensino Médio</option>
-                </select>
+                  <Plus size={20} strokeWidth={4} /> Adicionar outro aluno
+                </button>
+                <button
+                  type="submit"
+                  className="flex-[2] py-5 bg-green-500 text-white font-black rounded-2xl border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] uppercase text-xs hover:bg-green-600 transition-all"
+                >
+                  Cadastrar todos os alunos
+                </button>
               </div>
-              <button
-                type="submit"
-                className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95"
-              >
-                Salvar Aluno
-              </button>
             </form>
           </div>
         </div>
@@ -515,14 +582,14 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                   placeholder="Login"
                   value={editingStudentForm.login}
                   onChange={e => setEditingStudentForm({ ...editingStudentForm, login: e.target.value })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
                 />
                 <input
                   required
                   placeholder="Senha"
                   value={editingStudentForm.password}
                   onChange={e => setEditingStudentForm({ ...editingStudentForm, password: e.target.value })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
                 />
               </div>
               <div className="grid grid-cols-2 gap-6">
@@ -531,22 +598,19 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                   placeholder="Série"
                   value={editingStudentForm.serie}
                   onChange={e => setEditingStudentForm({ ...editingStudentForm, serie: e.target.value })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
                 />
                 <select
                   value={editingStudentForm.ciclo}
                   onChange={e => setEditingStudentForm({ ...editingStudentForm, ciclo: e.target.value as any })}
-                  className="w-full p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-950 outline-none font-black"
+                  className="w-full p-6 bg-slate-50 rounded-[2rem] outline-none border-4 border-indigo-950 font-black text-indigo-950 text-lg"
                 >
                   <option value="Anos Iniciais">Anos Iniciais</option>
                   <option value="Anos Finais">Anos Finais</option>
                   <option value="Ensino Médio">Ensino Médio</option>
                 </select>
               </div>
-              <button
-                type="submit"
-                className="w-full py-7 bg-indigo-600 text-white font-black rounded-[2.5rem] shadow-xl mt-4 uppercase italic text-xl tracking-widest border-[8px] border-indigo-950 shadow-[0_10px_0_0_rgba(30,27,75,1)] active:scale-95"
-              >
+              <button type="submit" className="w-full py-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-[2.5rem] shadow-[0_12px_0_0_rgba(30,27,75,1)] transform active:scale-95 active:translate-y-1 active:shadow-none transition-all text-2xl uppercase italic tracking-tighter border-[8px] border-indigo-950">
                 Salvar Alterações
               </button>
             </form>
@@ -556,11 +620,13 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
       {isAvatarPickerOpen && (
         <AvatarPickerModal
-          onClose={() => setIsAvatarPickerOpen(false)}
+          currentAvatarSeed={user.avatarSeed}
+          currentAvatarUrl={user.avatarUrl}
           onSelect={(updates) => {
-            onUpdateProfile?.(updates);
+            if (onUpdateProfile) onUpdateProfile(updates);
             setIsAvatarPickerOpen(false);
           }}
+          onClose={() => setIsAvatarPickerOpen(false)}
         />
       )}
     </div>

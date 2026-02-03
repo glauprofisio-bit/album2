@@ -93,7 +93,7 @@ const StickerEditor: React.FC<StickerEditorProps> = ({ week, sticker, onSave }) 
       >
         <div className="aspect-[3/4] w-full rounded-[2rem] overflow-hidden border-4 border-indigo-950 bg-slate-50 flex items-center justify-center mb-3">
           {sticker.imageUrl ? (
-            <img src={sticker.imageUrl} className="w-full h-full object-cover" />
+            <img src={sticker.imageUrl} className="w-full h-full object-cover" alt="sticker" />
           ) : (
             <div className="text-slate-300 font-black uppercase text-[10px] flex items-center gap-2">
               <ImageIcon size={16} /> Sem imagem
@@ -180,7 +180,7 @@ const StickerEditor: React.FC<StickerEditorProps> = ({ week, sticker, onSave }) 
 
               <div className="aspect-video w-full rounded-[2rem] overflow-hidden border-4 border-indigo-950 bg-indigo-50 flex items-center justify-center shadow-inner">
                 {url ? (
-                  <img src={url} className="max-w-full max-h-full object-contain" />
+                  <img src={url} className="max-w-full max-h-full object-contain" alt="preview" />
                 ) : (
                   <div className="text-slate-300 font-black uppercase text-[10px] flex items-center gap-2">
                     <ImageIcon size={16} /> Sem imagem
@@ -238,11 +238,10 @@ const StickerEditor: React.FC<StickerEditorProps> = ({ week, sticker, onSave }) 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => {
   const [activeTab, setActiveTab] = useState<'professors' | 'stickers' | 'config'>('professors');
   const [isAddingProf, setIsAddingProf] = useState(false);
-
-  const [profForm, setProfForm] = useState({ name: '', email: '', login: '', password: '' });
+  const [profForm, setProfForm] = useState({ name: '', login: '', password: '' });
 
   const [editingProfId, setEditingProfId] = useState<string | null>(null);
-  const [editingProfForm, setEditingProfForm] = useState({ name: '', email: '', login: '', password: '' });
+  const [editingProfForm, setEditingProfForm] = useState({ name: '', login: '', password: '' });
 
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -272,12 +271,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
     const newProf: User = {
       id: Math.random().toString(36).slice(2, 11),
       ...profForm,
+      email: '',
       role: UserRole.PROFESSOR
     };
 
     await updateData({ professors: [...data.professors, newProf] });
 
-    setProfForm({ name: '', email: '', login: '', password: '' });
+    setProfForm({ name: '', login: '', password: '' });
     setIsAddingProf(false);
     setIsSyncing(false);
   };
@@ -396,7 +396,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
                         setEditingProfId(p.id);
                         setEditingProfForm({
                           name: p.name,
-                          email: (p as any).email || '',
                           login: p.login,
                           password: p.password || ''
                         });
@@ -459,6 +458,64 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
             >
               +
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Adicionar Professor */}
+      {isAddingProf && (
+        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[2000] flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsAddingProf(false)}>
+          <div className="bg-white p-10 rounded-[4rem] w-full max-w-[520px] shadow-2xl relative border-[12px] border-indigo-950 my-auto animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setIsAddingProf(false)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl">
+              <X size={24} strokeWidth={4} />
+            </button>
+            <h3 className="text-4xl font-black text-indigo-950 mb-8 italic uppercase tracking-tighter text-center">Novo Professor</h3>
+            <form onSubmit={handleAddProfessor} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Nome Completo</label>
+                <input required value={profForm.name} onChange={e => setProfForm({ ...profForm, name: e.target.value })} className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Login de Acesso</label>
+                <input required value={profForm.login} onChange={e => setProfForm({ ...profForm, login: e.target.value })} className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Senha</label>
+                <input required value={profForm.password} onChange={e => setProfForm({ ...profForm, password: e.target.value })} className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950" />
+              </div>
+              <button type="submit" disabled={isSyncing} className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl uppercase text-[11px] tracking-widest border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] disabled:opacity-50">
+                {isSyncing ? 'Salvando...' : 'Criar Professor'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Professor */}
+      {editingProfId && (
+        <div className="fixed inset-0 bg-indigo-950/95 backdrop-blur-xl z-[2000] flex items-center justify-center p-4 overflow-y-auto" onClick={() => setEditingProfId(null)}>
+          <div className="bg-white p-10 rounded-[4rem] w-full max-w-[520px] shadow-2xl relative border-[12px] border-indigo-950 my-auto animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setEditingProfId(null)} className="absolute -top-6 -right-6 p-4 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl">
+              <X size={24} strokeWidth={4} />
+            </button>
+            <h3 className="text-4xl font-black text-indigo-950 mb-8 italic uppercase tracking-tighter text-center">Editar Professor</h3>
+            <form onSubmit={handleEditProfessor} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Nome Completo</label>
+                <input required value={editingProfForm.name} onChange={e => setEditingProfForm({ ...editingProfForm, name: e.target.value })} className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Login de Acesso</label>
+                <input required value={editingProfForm.login} onChange={e => setEditingProfForm({ ...editingProfForm, login: e.target.value })} className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-indigo-300 ml-4 tracking-widest">Senha</label>
+                <input required value={editingProfForm.password} onChange={e => setEditingProfForm({ ...editingProfForm, password: e.target.value })} className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950" />
+              </div>
+              <button type="submit" disabled={isSyncing} className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl uppercase text-[11px] tracking-widest border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] disabled:opacity-50">
+                {isSyncing ? 'Salvando...' : 'Salvar Alterações'}
+              </button>
+            </form>
           </div>
         </div>
       )}
