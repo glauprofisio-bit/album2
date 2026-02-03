@@ -1,4 +1,5 @@
 import type { AppData } from './types';
+import { supabase } from './supabaseClient';
 
 export const initialData: AppData = {
   professors: [],
@@ -29,15 +30,34 @@ export async function syncWithCloud(): Promise<AppData | null> {
   }
 }
 
-export async function saveData(appData: AppData): Promise<void> {
-  const res = await fetch('/api/save-data', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(appData)
-  });
+export async function saveData(appData: AppData): Promise<{ success: boolean; error?: string }> {
+  try {
+    // 1. Salvar student_stickers diretamente no Supabase
+    if (appData.studentStickers && appData.studentStickers.length > 0) {
+      const toUpsert = appData.studentStickers.map(ss => ({
+        student_id: ss.alunoId,
+        week: ss.week,
+        liberada: !!ss.liberada,
+        revelada: !!ss.revelada,
+        is_falta: !!ss.isFalta
+      }));
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    throw new Error(`saveData failed: ${res.status} ${txt}`);
+      const { error } = await supabase
+        .from('student_stickers')
+        .upsert(toUpsert, { onConflict: 'student_id, week' });
+
+      if (error) throw error;
+    }
+
+    // 2. Salvar currentWeek se necessário
+    await supabase
+      .from('app_settings')
+      .upsert({ id: 'global', current_week: appData.currentWeek }, { onConflict: 'id' });
+
+    return { success: true };
+  } catch (e: any) {
+    console.error('Direct Save Error:', e);
+    // Tenta via API como fallback se o Supabase direto falhar (opcional)
+    return { success: false, error: e.message };
   }
 }
