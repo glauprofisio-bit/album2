@@ -34,13 +34,18 @@ export async function saveData(appData: AppData): Promise<{ success: boolean; er
   try {
     // 1. Salvar student_stickers diretamente no Supabase
     if (appData.studentStickers && appData.studentStickers.length > 0) {
-      const toUpsert = appData.studentStickers.map(ss => ({
-        student_id: ss.alunoId,
-        week: ss.week,
-        liberada: !!ss.liberada,
-        revelada: !!ss.revelada,
-        is_falta: !!ss.isFalta
-      }));
+      // Mapeia os IDs para garantir que estamos enviando UUIDs válidos para o banco
+      const toUpsert = appData.studentStickers.map(ss => {
+        // Busca o aluno correspondente para pegar o ID real do banco (UUID)
+        const student = appData.students.find(s => s.id === ss.alunoId || s.login === ss.alunoId);
+        return {
+          student_id: student ? student.id : ss.alunoId,
+          week: ss.week,
+          liberada: !!ss.liberada,
+          revelada: !!ss.revelada,
+          is_falta: !!ss.isFalta
+        };
+      }).filter(item => item.student_id && item.student_id.includes('-')); // Garante que só enviamos UUIDs
 
       const { error } = await supabase
         .from('student_stickers')
