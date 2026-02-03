@@ -1,25 +1,40 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!url || !serviceKey) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-}
-
-const supabase = createClient(url, serviceKey);
-
 export default async function handler(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
   try {
-    const { professors = [], students = [], stickers = [], studentStickers = [], currentWeek } = req.body || {};
+    // CORS
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+
+    const url = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceKey) {
+      res.status(500).json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
+      return;
+    }
+
+    const supabase = createClient(url, serviceKey);
+
+    const {
+      professors = [],
+      students = [],
+      stickers = [],
+      studentStickers = [],
+      currentWeek
+    } = req.body || {};
 
     // current week
     if (currentWeek !== undefined && currentWeek !== null) {
@@ -103,6 +118,69 @@ export default async function handler(req, res) {
 
     // stickers
     for (const st of stickers) {
+      if (!st?.week) continue;
+
+      const imageUrl = String(st.imageUrl || '').trim();
+
+      if (!imageUrl) {
+        const { error: delErr } = await supabase.from('stickers').delete().eq('week', st.week);
+        if (delErr) throw new Error(`stickers delete week ${st.week}: ${delErr.message}`);
+        continue;
+      }
+
+      const { error } = await supabase.from('stickers').upsert(
+        {
+          week: st.week,
+          name: st.name || `Semana ${st.week}`,
+          image_url: imageUrl,
+          rarity: st.rarity || 'NORMAL'
+        },
+        { onConflict: 'week' }
+      );
+      if (error) throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
+    }
+
+    // student_stickers
+    for (const ss of studentStickers) {
+      if (!ss?.week) continue;
+
+      let studentId = null;
+
+      if (ss.alunoId && typeof ss.alunoId === 'string' && ss.alunoId.includes('-')) {
+        studentId = ss.alunoId;
+      } else {
+        const login = ss.alunoLogin || ss.alunoId;
+        if (login) {
+          const { data: st, error } = await supabase
+            .from('students')
+            .select('id')
+            .eq('login', login)
+            .single();
+          if (!error && st?.id) studentId = st.id;
+        }
+      }
+
+      if (!studentId) continue;
+
+      const { error } = await supabase.from('student_stickers').upsert(
+        {
+          student_id: studentId,
+          week: ss.week,
+          liberada: !!ss.liberada,
+          revelada: !!ss.revelada,
+          is_falta: !!ss.isFalta,
+          reconquistada: !!ss.reconquistada
+        },
+        { onConflict: 'student_id, week' }
+      );
+      if (error) throw new Error(`student_stickers upsert ${studentId}/${ss.week}: ${error.message}`);
+    }
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: String(err?.message || err) });
+  }
+}    for (const st of stickers) {
       if (!st?.week) continue;
 
       const imageUrl = String(st.imageUrl || '').trim();
