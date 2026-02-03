@@ -154,12 +154,12 @@ export default async function handler(req, res) {
         // Tenta achar o ID do aluno pelo login ou ID enviado
         let realStudentId = ss.alunoId;
         
-        // Lógica de mapeamento de ID robusta
-        const studentObj = students.find(s => s.id === ss.alunoId || s.login === ss.alunoId);
-        if (studentObj && studentMap.has(studentObj.login)) {
-           realStudentId = studentMap.get(studentObj.login);
-        } else if (studentMap.has(ss.alunoId)) {
-           realStudentId = studentMap.get(ss.alunoId);
+        // Mapeamento direto e simples: prioriza o ID que já é UUID, senão busca pelo login
+        if (ss.alunoId && ss.alunoId.length > 30) { 
+           realStudentId = ss.alunoId; // Provavelmente já é o UUID do banco afn
+        } else {
+           const studentObj = students.find(s => s.login === ss.alunoId || s.id === ss.alunoId);
+           if (studentObj) realStudentId = studentObj.id;
         }
 
         if (realStudentId) {

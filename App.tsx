@@ -64,7 +64,8 @@ const App: React.FC = () => {
 
     const trySave = async (dataToSave: AppData) => {
       try {
-        await saveData(dataToSave);
+        const result = await saveData(dataToSave);
+        if (!result.success) throw new Error(result.error || 'Falha no salvamento');
         
         if (pendingUpdateRef.current) {
           const nextData = pendingUpdateRef.current;
@@ -73,9 +74,7 @@ const App: React.FC = () => {
         }
       } catch (e: any) {
         console.error('Erro ao salvar dados:', e);
-        // MOSTRAR ERRO NA TELA PARA O USUÁRIO
-        alert('ERRO AO SALVAR NO BANCO: ' + (e.message || 'Erro desconhecido'));
-        // NÃO rodar performSync(true) em caso de erro para não apagar o que o usuário fez
+        alert('ERRO AO SALVAR NO BANCO: ' + (e.message || 'Verifique sua conexão ou chaves do Supabase'));
       }
     };
 
