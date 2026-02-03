@@ -163,17 +163,13 @@ export default async function handler(req, res) {
         }
 
         if (realStudentId) {
-          // Busca o ID da figurinha real para essa semana se existir
-          const stickerId = stickerMap.get(ss.week);
-          
+          // Simplificação máxima para garantir o salvamento no banco afn
           ssToUpsert.push({
             student_id: realStudentId,
-            sticker_id: stickerId || null, // Se não tiver figurinha cadastrada para a semana, salva nulo mas mantém a semana
             week: ss.week,
-            liberada: !!ss.liberada,
-            revelada: !!ss.revelada,
-            is_falta: !!ss.isFalta,
-            reconquistada: !!ss.reconquistada
+            liberada: ss.liberada === true,
+            is_falta: ss.isFalta === true,
+            revelada: ss.revelada === true
           });
         }
            if (ssToUpsert.length > 0) {
