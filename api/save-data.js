@@ -1,40 +1,25 @@
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
   try {
-    // CORS
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (req.method === 'OPTIONS') {
-      res.status(200).end();
-      return;
-    }
-
-    if (req.method !== 'POST') {
-      res.status(405).json({ error: 'Method not allowed' });
-      return;
-    }
-
     const url = process.env.SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!url || !serviceKey) {
-      res.status(500).json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
-      return;
+      return res.status(500).json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
     }
 
     const supabase = createClient(url, serviceKey);
 
-    const {
-      professors = [],
-      students = [],
-      stickers = [],
-      studentStickers = [],
-      currentWeek
-    } = req.body || {};
+    const { professors = [], students = [], stickers = [], studentStickers = [], currentWeek } = req.body || {};
 
     // current week
     if (currentWeek !== undefined && currentWeek !== null) {
@@ -116,7 +101,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // stickers
+    // stickers (delete if empty image)
     for (const st of stickers) {
       if (!st?.week) continue;
 
@@ -129,12 +114,7 @@ export default async function handler(req, res) {
       }
 
       const { error } = await supabase.from('stickers').upsert(
-        {
-          week: st.week,
-          name: st.name || `Semana ${st.week}`,
-          image_url: imageUrl,
-          rarity: st.rarity || 'NORMAL'
-        },
+        { week: st.week, name: st.name || `Semana ${st.week}`, image_url: imageUrl, rarity: st.rarity || 'NORMAL' },
         { onConflict: 'week' }
       );
       if (error) throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
@@ -151,11 +131,7 @@ export default async function handler(req, res) {
       } else {
         const login = ss.alunoLogin || ss.alunoId;
         if (login) {
-          const { data: st, error } = await supabase
-            .from('students')
-            .select('id')
-            .eq('login', login)
-            .single();
+          const { data: st, error } = await supabase.from('students').select('id').eq('login', login).single();
           if (!error && st?.id) studentId = st.id;
         }
       }
@@ -174,434 +150,6 @@ export default async function handler(req, res) {
         { onConflict: 'student_id, week' }
       );
       if (error) throw new Error(`student_stickers upsert ${studentId}/${ss.week}: ${error.message}`);
-    }
-
-    res.status(200).json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: String(err?.message || err) });
-  }
-}    for (const st of stickers) {
-      if (!st?.week) continue;
-
-      const imageUrl = String(st.imageUrl || '').trim();
-
-      if (!imageUrl) {
-        const { error: delErr } = await supabase.from('stickers').delete().eq('week', st.week);
-        if (delErr) throw new Error(`stickers delete week ${st.week}: ${delErr.message}`);
-        continue;
-      }
-
-      const { error } = await supabase.from('stickers').upsert(
-        {
-          week: st.week,
-          name: st.name || `Semana ${st.week}`,
-          image_url: imageUrl,
-          rarity: st.rarity || 'NORMAL'
-        },
-        { onConflict: 'week' }
-      );
-      if (error) throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
-    }
-
-    // student_stickers
-    for (const ss of studentStickers) {
-      if (!ss?.week) continue;
-
-      let studentId = null;
-
-      if (ss.alunoId && typeof ss.alunoId === 'string' && ss.alunoId.includes('-')) {
-        studentId = ss.alunoId;
-      } else {
-        const login = ss.alunoLogin || ss.alunoId;
-        if (login) {
-          const { data: st, error } = await supabase
-            .from('students')
-            .select('id')
-            .eq('login', login)
-            .single();
-          if (!error && st?.id) studentId = st.id;
-        }
-      }
-
-      if (!studentId) continue;
-
-      const { error } = await supabase.from('student_stickers').upsert(
-        {
-          student_id: studentId,
-          week: ss.week,
-          liberada: !!ss.liberada,
-          revelada: !!ss.revelada,
-          is_falta: !!ss.isFalta,
-          reconquistada: !!ss.reconquistada
-        },
-        { onConflict: 'student_id, week' }
-      );
-      if (error) throw new Error(`student_stickers upsert ${studentId}/${ss.week}: ${error.message}`);
-    }
-
-    return res.status(200).json({ success: true });
-  } catch (err) {
-    return res.status(500).json({ error: String(err?.message || err) });
-  }
-}
-    {
-      const { data: existingStudents, error } = await supabase.from('students').select('login');
-      if (error) throw new Error(`students select: ${error.message}`);
-
-      const toDelete = (existingStudents || [])
-        .map(r => r.login)
-        .filter(l => l && !incomingStudentLogins.has(l));
-
-      if (toDelete.length) {
-        const { error: delErr } = await supabase.from('students').delete().in('login', toDelete);
-        if (delErr) throw new Error(`students delete: ${delErr.message}`);
-      }
-    }
-
-    // 4) FIGURINHAS (UPSERT ou DELETE)
-    if (Array.isArray(stickers)) {
-      for (const st of stickers) {
-        if (!st?.week) continue;
-
-        const imageUrl = String(st.imageUrl || '').trim();
-
-        if (!imageUrl) {
-          const { error: delErr } = await supabase.from('stickers').delete().eq('week', st.week);
-          if (delErr) throw new Error(`stickers delete week ${st.week}: ${delErr.message}`);
-          continue;
-        }
-
-        const { error } = await supabase.from('stickers').upsert(
-          {
-            week: st.week,
-            name: st.name || `Semana ${st.week}`,
-            image_url: imageUrl,
-            rarity: st.rarity || 'NORMAL'
-          },
-          { onConflict: 'week' }
-        );
-
-        if (error) throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
-      }
-    }
-
-    // 5) student_stickers (UPSERT)
-    if (Array.isArray(studentStickers) && studentStickers.length > 0) {
-      for (const ss of studentStickers) {
-        if (!ss?.week) continue;
-
-        let studentId = null;
-
-        if (ss.alunoId && typeof ss.alunoId === 'string' && ss.alunoId.includes('-')) {
-          studentId = ss.alunoId;
-        } else {
-          const login = ss.alunoLogin || ss.alunoId;
-          if (login) {
-            const { data: st, error } = await supabase
-              .from('students')
-              .select('id')
-              .eq('login', login)
-              .single();
-
-            if (error) continue;
-            if (st?.id) studentId = st.id;
-          }
-        }
-
-        if (!studentId) continue;
-
-        const { error } = await supabase.from('student_stickers').upsert(
-          {
-            student_id: studentId,
-            week: ss.week,
-            liberada: !!ss.liberada,
-            revelada: !!ss.revelada,
-            is_falta: !!ss.isFalta,
-            reconquistada: !!ss.reconquistada
-          },
-          { onConflict: 'student_id, week' }
-        );
-
-        if (error) throw new Error(`student_stickers upsert ${studentId}/${ss.week}: ${error.message}`);
-      }
-    }
-
-    return res.status(200).json({ success: true });
-  } catch (err) {
-    return res.status(500).json({ error: String(err?.message || err) });
-  }
-}    }
-
-    // deletar do banco quem não está mais na lista do app
-    {
-      const { data: existingStudents, error } = await supabase
-        .from('students')
-        .select('login');
-
-      if (error) throw new Error(`students select: ${error.message}`);
-
-      const toDelete = (existingStudents || [])
-        .map(r => r.login)
-        .filter(l => l && !incomingStudentLogins.has(l));
-
-      if (toDelete.length > 0) {
-        const { error: delErr } = await supabase
-          .from('students')
-          .delete()
-          .in('login', toDelete);
-
-        if (delErr) throw new Error(`students delete: ${delErr.message}`);
-      }
-    }
-
-    // =========================
-    // 4) FIGURINHAS (UPSERT ou DELETE)
-    // regra: se imageUrl vier vazio, remove do banco aquela semana
-    // =========================
-    if (Array.isArray(stickers)) {
-      for (const st of stickers) {
-        if (!st?.week) continue;
-
-        const imageUrl = String(st.imageUrl || '').trim();
-
-        if (!imageUrl) {
-          const { error: delErr } = await supabase
-            .from('stickers')
-            .delete()
-            .eq('week', st.week);
-
-          if (delErr) throw new Error(`stickers delete week ${st.week}: ${delErr.message}`);
-          continue;
-        }
-
-        const { error } = await supabase.from('stickers').upsert(
-          {
-            week: st.week,
-            name: st.name || `Semana ${st.week}`,
-            image_url: imageUrl,
-            rarity: st.rarity || 'NORMAL'
-          },
-          { onConflict: 'week' }
-        );
-
-        if (error) throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
-      }
-    }
-
-    // =========================
-    // 5) student_stickers (UPSERT)
-    // =========================
-    if (Array.isArray(studentStickers) && studentStickers.length > 0) {
-      for (const ss of studentStickers) {
-        if (!ss?.week) continue;
-
-        let studentId = null;
-
-        // UUID direto
-        if (ss.alunoId && typeof ss.alunoId === 'string' && ss.alunoId.includes('-')) {
-          studentId = ss.alunoId;
-        } else {
-          // fallback por login
-          const login = ss.alunoLogin || ss.alunoId;
-          if (login) {
-            const { data: st, error } = await supabase
-              .from('students')
-              .select('id')
-              .eq('login', login)
-              .single();
-
-            if (error) continue;
-            if (st?.id) studentId = st.id;
-          }
-        }
-
-        if (!studentId) continue;
-
-        const { error } = await supabase.from('student_stickers').upsert(
-          {
-            student_id: studentId,
-            week: ss.week,
-            liberada: !!ss.liberada,
-            revelada: !!ss.revelada,
-            is_falta: !!ss.isFalta,
-            reconquistada: !!ss.reconquistada
-          },
-          { onConflict: 'student_id, week' }
-        );
-
-        if (error) throw new Error(`student_stickers upsert ${studentId}/${ss.week}: ${error.message}`);
-      }
-    }
-
-    return res.status(200).json({ success: true });
-  } catch (err) {
-    return res.status(500).json({ error: String(err?.message || err) });
-  }
-}        .filter(l => l && !incomingStudentLogins.has(l));
-
-      if (toDelete.length > 0) {
-        const { error: delErr } = await supabase.from('students').delete().in('login', toDelete);
-        if (delErr) throw new Error(`students delete: ${delErr.message}`);
-      }
-    }
-
-   // =========================
-// 4) FIGURINHAS (UPSERT ou DELETE)
-// =========================
-if (Array.isArray(stickers)) {
-  for (const st of stickers) {
-    if (!st?.week) continue;
-
-    const imageUrl = (st.imageUrl || '').trim();
-
-    // Se veio vazio: remove a figurinha do banco
-    if (!imageUrl) {
-      const { error: delErr } = await supabase
-        .from('stickers')
-        .delete()
-        .eq('week', st.week);
-
-      if (delErr) {
-        throw new Error(`stickers delete week ${st.week}: ${delErr.message}`);
-      }
-      continue;
-    }
-
-    // Se veio imagem: salva ou substitui normalmente
-    const { error } = await supabase
-      .from('stickers')
-      .upsert(
-        {
-          week: st.week,
-          name: st.name || `Semana ${st.week}`,
-          image_url: imageUrl,
-          rarity: st.rarity || 'NORMAL'
-        },
-        { onConflict: 'week' }
-      );
-
-    if (error) {
-      throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
-    }
-  }
-}
-
-    // =========================
-    // 5) student_stickers (UPSERT)
-    // =========================
-    if (Array.isArray(studentStickers) && studentStickers.length > 0) {
-      for (const ss of studentStickers) {
-        if (!ss?.week) continue;
-
-        let studentId = null;
-
-        // UUID direto
-        if (ss.alunoId && typeof ss.alunoId === 'string' && ss.alunoId.includes('-')) {
-          studentId = ss.alunoId;
-        } else {
-          const login = ss.alunoLogin || ss.alunoId;
-          if (login) {
-            const { data: st, error } = await supabase
-              .from('students')
-              .select('id')
-              .eq('login', login)
-              .single();
-
-            if (error) continue;
-            if (st?.id) studentId = st.id;
-          }
-        }
-
-        if (!studentId) continue;
-
-        const { error } = await supabase.from('student_stickers').upsert(
-          {
-            student_id: studentId,
-            week: ss.week,
-            liberada: !!ss.liberada,
-            revelada: !!ss.revelada,
-            is_falta: !!ss.isFalta,
-            reconquistada: !!ss.reconquistada
-          },
-          { onConflict: 'student_id, week' }
-        );
-        if (error) throw new Error(`student_stickers upsert ${studentId}/${ss.week}: ${error.message}`);
-      }
-    }
-
-    return res.status(200).json({ success: true });
-  } catch (err) {
-    return res.status(500).json({ error: String(err?.message || err) });
-  }
-}        .filter(l => l && !incomingStudentLogins.has(l));
-
-      if (toDelete.length > 0) {
-        const { error: delErr } = await supabase.from('students').delete().in('login', toDelete);
-        if (delErr) throw new Error(`students delete: ${delErr.message}`);
-      }
-    }
-
-    // =========================
-    // 4) FIGURINHAS (UPSERT)
-    // =========================
-    if (Array.isArray(stickers)) {
-      for (const st of stickers) {
-        if (!st?.week) continue;
-
-        const { error } = await supabase.from('stickers').upsert(
-          {
-            week: st.week,
-            name: st.name || `Semana ${st.week}`,
-            image_url: st.imageUrl || '',
-            rarity: st.rarity || 'NORMAL'
-          },
-          { onConflict: 'week' }
-        );
-        if (error) throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
-      }
-    }
-
-    // =========================
-    // 5) student_stickers (UPSERT)
-    // =========================
-    if (Array.isArray(studentStickers) && studentStickers.length > 0) {
-      for (const ss of studentStickers) {
-        if (!ss?.week) continue;
-
-        let studentId = null;
-
-        // UUID direto
-        if (ss.alunoId && typeof ss.alunoId === 'string' && ss.alunoId.includes('-')) {
-          studentId = ss.alunoId;
-        } else {
-          const login = ss.alunoLogin || ss.alunoId;
-          if (login) {
-            const { data: st, error } = await supabase
-              .from('students')
-              .select('id')
-              .eq('login', login)
-              .single();
-
-            if (error) continue;
-            if (st?.id) studentId = st.id;
-          }
-        }
-
-        if (!studentId) continue;
-
-        const { error } = await supabase.from('student_stickers').upsert(
-          {
-            student_id: studentId,
-            week: ss.week,
-            liberada: !!ss.liberada,
-            revelada: !!ss.revelada,
-            is_falta: !!ss.isFalta,
-            reconquistada: !!ss.reconquistada
-          },
-          { onConflict: 'student_id, week' }
-        );
-        if (error) throw new Error(`student_stickers upsert ${studentId}/${ss.week}: ${error.message}`);
-      }
     }
 
     return res.status(200).json({ success: true });
