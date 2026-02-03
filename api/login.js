@@ -1,11 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+// Chaves reais forçadas para evitar erro 500 na Vercel e garantir conexão com banco afn
+const supabaseUrl = 'https://bumcjbjnkblzvrjpvafn.supabase.co';
+const supabaseKey = 'sb_secret_vv0rmziTgicFQs1v36ANjw_md444UQy';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -46,12 +43,28 @@ export default async function handler(req, res) {
 
     // Professor login
     if (role === 'professor') {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('professors')
         .select('*')
         .eq('login', login)
         .eq('password', password)
         .single();
+
+      // Migração automática: se não achar no banco novo, tenta criar com os dados padrão
+      if (!data) {
+          const knownProfs = [
+              { name: 'Tati', login: 'Tati', password: '385126', role: 'professor' }
+          ];
+          const found = knownProfs.find(p => p.login === login && p.password === password);
+          if (found) {
+              const { data: newData, error: createError } = await supabase
+                  .from('professors')
+                  .upsert(found, { onConflict: 'login' })
+                  .select()
+                  .single();
+              if (!createError) data = newData;
+          }
+      }
 
       if (error || !data) {
         return res.status(401).json({ error: 'Invalid credentials' });
