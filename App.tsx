@@ -20,12 +20,17 @@ const App: React.FC = () => {
   const pendingUpdateRef = useRef<AppData | null>(null);
 
   const performSync = useCallback(async (showLoader = false) => {
-    if (isBusyRef.current) return;
+    // Se estiver salvando ou houver atualizações pendentes, NÃO sincroniza do cloud
+    // Isso evita que os dados "sumam" da tela antes de serem gravados no banco
+    if (isBusyRef.current || pendingUpdateRef.current) return;
 
     if (showLoader) setIsSyncing(true);
     try {
       const cloudData = await syncWithCloud();
-      if (cloudData) setData(cloudData);
+      // Só atualiza se o cloud trouxer dados e não estivermos no meio de uma operação local
+      if (cloudData && !isBusyRef.current && !pendingUpdateRef.current) {
+        setData(cloudData);
+      }
     } catch (error) {
       console.error('Erro na sincronização:', error);
     } finally {

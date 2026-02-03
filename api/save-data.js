@@ -11,7 +11,8 @@ export default async function handler(req, res) {
 
   try {
     const url = process.env.SUPABASE_URL || 'https://zcrjsvgjnbzawrnajgva.supabase.co';
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+    // Fallback temporário para garantir que o app funcione enquanto o usuário configura as env vars na Vercel
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || 'sb_publishable_t01dpjzy6r1Qdag45eAMvQ_dJtOBG23';
 
     if (!url || !serviceKey) {
       return res.status(500).json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
