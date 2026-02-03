@@ -1,10 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Chaves reais forçadas para evitar erro 500 na Vercel
-const supabaseUrl = 'https://bumcjbjnkblzvrjpvafn.supabase.co';
-const supabaseKey = 'sb_secret_vv0rmziTgicFQs1v36ANjw_md444UQy';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,6 +10,15 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
+    const url = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceKey) {
+      return res.status(500).json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
+    }
+
+    const supabase = createClient(url, serviceKey);
+
     const { data: profs, error: eProfs } = await supabase.from('professors').select('*');
     if (eProfs) throw new Error(`professors: ${eProfs.message}`);
 
@@ -38,7 +42,6 @@ export default async function handler(req, res) {
 
     const currentWeek = eSet ? 1 : (settings?.current_week || 1);
 
-    // sempre monta as 45 semanas (mesmo se não existir linha no banco)
     const stickersMap = new Map();
     (stickersRows || []).forEach(s => stickersMap.set(s.week, s));
 
@@ -92,6 +95,6 @@ export default async function handler(req, res) {
     return res.status(200).json(appData);
   } catch (error) {
     console.error('Erro no handler load-data:', error);
-    return res.status(500).json({ error: 'Internal server error', details: String(error) });
+    return res.status(500).json({ error: String(error?.message || error) });
   }
 }
