@@ -1,10 +1,10 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://bumcjbjnkblzvrjpvafn.supabase.co';
+  process.env.SUPABASE_URL;
 
 const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_vv0rmziTgicFQs1v36ANjw_md444UQy';
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
