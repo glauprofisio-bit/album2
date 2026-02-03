@@ -165,8 +165,12 @@ export default async function handler(req, res) {
         }
 
         if (realStudentId) {
+          // Busca o ID da figurinha real para essa semana se existir
+          const stickerId = stickerMap.get(ss.week);
+          
           ssToUpsert.push({
             student_id: realStudentId,
+            sticker_id: stickerId || null, // Se não tiver figurinha cadastrada para a semana, salva nulo mas mantém a semana
             week: ss.week,
             liberada: !!ss.liberada,
             revelada: !!ss.revelada,
@@ -174,14 +178,19 @@ export default async function handler(req, res) {
             reconquistada: !!ss.reconquistada
           });
         }
-      }
-
-      if (ssToUpsert.length > 0) {
+           if (ssToUpsert.length > 0) {
         const CHUNK_SIZE = 50;
         for (let i = 0; i < ssToUpsert.length; i += CHUNK_SIZE) {
           const chunk = ssToUpsert.slice(i, i + CHUNK_SIZE);
-          const { error } = await supabase.from('student_stickers').upsert(chunk, { onConflict: 'student_id, week' });
-          if (error) console.error(`Chunk error: ${error.message}`);
+          console.log(`Upserting chunk of ${chunk.length} stickers...`);
+          const { error: ssError } = await supabase
+            .from('student_stickers')
+            .upsert(chunk, { onConflict: 'student_id, week' });
+          
+          if (ssError) {
+            console.error('Erro no upsert de student_stickers:', ssError);
+            throw new Error(`Erro ao salvar figurinhas: ${ssError.message}`);
+          }
         }
       }
     }
