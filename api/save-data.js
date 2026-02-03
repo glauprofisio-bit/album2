@@ -1,12 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
-);
+const url = process.env.SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!url || !serviceKey) {
+  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in Vercel env vars');
+}
+
+const supabase = createClient(url, serviceKey);
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  // (opcional, mas ajuda)
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const {
@@ -26,9 +37,7 @@ export default async function handler(req, res) {
       if (error) throw new Error(`app_settings upsert: ${error.message}`);
     }
 
-    // =========================
     // 2) PROFESSORES (UPSERT + DELETE)
-    // =========================
     const incomingProfLogins = new Set();
 
     if (Array.isArray(professors)) {
@@ -53,31 +62,21 @@ export default async function handler(req, res) {
       }
     }
 
-    // deletar do banco quem não está mais na lista do app
     {
-      const { data: existingProfs, error } = await supabase
-        .from('professors')
-        .select('login');
-
+      const { data: existingProfs, error } = await supabase.from('professors').select('login');
       if (error) throw new Error(`professors select: ${error.message}`);
 
       const toDelete = (existingProfs || [])
         .map(r => r.login)
         .filter(l => l && l !== 'admin' && !incomingProfLogins.has(l));
 
-      if (toDelete.length > 0) {
-        const { error: delErr } = await supabase
-          .from('professors')
-          .delete()
-          .in('login', toDelete);
-
+      if (toDelete.length) {
+        const { error: delErr } = await supabase.from('professors').delete().in('login', toDelete);
         if (delErr) throw new Error(`professors delete: ${delErr.message}`);
       }
     }
 
-    // =========================
     // 3) ALUNOS (UPSERT + DELETE)
-    // =========================
     const incomingStudentLogins = new Set();
 
     if (Array.isArray(students)) {
@@ -103,6 +102,94 @@ export default async function handler(req, res) {
         if (error) throw new Error(`students upsert ${s.login}: ${error.message}`);
       }
     }
+
+    {
+      const { data: existingStudents, error } = await supabase.from('students').select('login');
+      if (error) throw new Error(`students select: ${error.message}`);
+
+      const toDelete = (existingStudents || [])
+        .map(r => r.login)
+        .filter(l => l && !incomingStudentLogins.has(l));
+
+      if (toDelete.length) {
+        const { error: delErr } = await supabase.from('students').delete().in('login', toDelete);
+        if (delErr) throw new Error(`students delete: ${delErr.message}`);
+      }
+    }
+
+    // 4) FIGURINHAS (UPSERT ou DELETE)
+    if (Array.isArray(stickers)) {
+      for (const st of stickers) {
+        if (!st?.week) continue;
+
+        const imageUrl = String(st.imageUrl || '').trim();
+
+        if (!imageUrl) {
+          const { error: delErr } = await supabase.from('stickers').delete().eq('week', st.week);
+          if (delErr) throw new Error(`stickers delete week ${st.week}: ${delErr.message}`);
+          continue;
+        }
+
+        const { error } = await supabase.from('stickers').upsert(
+          {
+            week: st.week,
+            name: st.name || `Semana ${st.week}`,
+            image_url: imageUrl,
+            rarity: st.rarity || 'NORMAL'
+          },
+          { onConflict: 'week' }
+        );
+
+        if (error) throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
+      }
+    }
+
+    // 5) student_stickers (UPSERT)
+    if (Array.isArray(studentStickers) && studentStickers.length > 0) {
+      for (const ss of studentStickers) {
+        if (!ss?.week) continue;
+
+        let studentId = null;
+
+        if (ss.alunoId && typeof ss.alunoId === 'string' && ss.alunoId.includes('-')) {
+          studentId = ss.alunoId;
+        } else {
+          const login = ss.alunoLogin || ss.alunoId;
+          if (login) {
+            const { data: st, error } = await supabase
+              .from('students')
+              .select('id')
+              .eq('login', login)
+              .single();
+
+            if (error) continue;
+            if (st?.id) studentId = st.id;
+          }
+        }
+
+        if (!studentId) continue;
+
+        const { error } = await supabase.from('student_stickers').upsert(
+          {
+            student_id: studentId,
+            week: ss.week,
+            liberada: !!ss.liberada,
+            revelada: !!ss.revelada,
+            is_falta: !!ss.isFalta,
+            reconquistada: !!ss.reconquistada
+          },
+          { onConflict: 'student_id, week' }
+        );
+
+        if (error) throw new Error(`student_stickers upsert ${studentId}/${ss.week}: ${error.message}`);
+      }
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: String(err?.message || err) });
+  }
+}    }
 
     // deletar do banco quem não está mais na lista do app
     {
