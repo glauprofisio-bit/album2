@@ -49,17 +49,3 @@ export async function saveData(appData: AppData): Promise<{ success: boolean; er
     return { success: false, error: e?.message || String(e) };
   }
 }
-
-// Agora deletar aluno também passa pela API (não salva direto no Supabase no browser)
-export async function deleteStudent(studentId: string): Promise<void> {
-  const res = await fetch('/api/delete-student', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ studentId }),
-  });
-
-  if (!res.ok) {
-    const json = await res.json().catch(() => ({}));
-    throw new Error(json?.error || 'Falha ao deletar aluno');
-  }
-}
