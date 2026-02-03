@@ -39,23 +39,31 @@ const App: React.FC = () => {
   }, [performSync]);
 
   const updateData = async (newData: Partial<AppData>) => {
-    isBusyRef.current = true;
-    setIsSaving(true);
+  if (isBusyRef.current) return;
 
-    const updatedData = { ...data, ...newData };
-    setData(updatedData);
+  const previousData = data;
+  const updatedData = { ...data, ...newData };
 
-    try {
-      await saveData(updatedData);
-    } catch (e) {
-      console.error('Erro ao salvar:', e);
-    } finally {
-      setTimeout(() => {
-        isBusyRef.current = false;
-        setIsSaving(false);
-      }, 500);
-    }
-  };
+  isBusyRef.current = true;
+  setIsSaving(true);
+
+  // otimista: mostra na tela
+  setData(updatedData);
+
+  try {
+    await saveData(updatedData);
+  } catch (e) {
+    // volta exatamente como estava antes
+    setData(previousData);
+    alert('Não salvou no servidor. Vou desfazer a alteração. (Confira a Vercel > Functions Logs)');
+    console.error('Erro ao salvar:', e);
+  } finally {
+    setTimeout(() => {
+      isBusyRef.current = false;
+      setIsSaving(false);
+    }, 500);
+  }
+};
 
   // ✅ RESOLVE USUÁRIO PELO ID (evita “voltar pro aluno”)
   const currentUser = useMemo(() => {
