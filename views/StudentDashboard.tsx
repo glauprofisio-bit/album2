@@ -288,3 +288,4 @@
       </div>
     );
   };
+export default StudentDashboard;
