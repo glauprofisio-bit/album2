@@ -110,37 +110,46 @@ export default async function handler(req, res) {
       }
     }
 
-    // =========================
-    // 4) FIGURINHAS (UPSERT ou DELETE por week)
-    // =========================
-    if (Array.isArray(stickers)) {
-      for (const st of stickers) {
-        if (!st?.week) continue;
+   // =========================
+// 4) FIGURINHAS (UPSERT ou DELETE)
+// =========================
+if (Array.isArray(stickers)) {
+  for (const st of stickers) {
+    if (!st?.week) continue;
 
-        const imageUrl = (st.imageUrl || '').trim();
-        const name = (st.name || `Semana ${st.week}`).trim();
-        const rarity = st.rarity || 'NORMAL';
+    const imageUrl = (st.imageUrl || '').trim();
 
-        // Se você "removeu" (imageUrl vazio), apaga do banco
-        if (!imageUrl) {
-          const { error: delErr } = await supabase.from('stickers').delete().eq('week', st.week);
-          if (delErr) throw new Error(`stickers delete week ${st.week}: ${delErr.message}`);
-          continue;
-        }
+    // Se veio vazio: remove a figurinha do banco
+    if (!imageUrl) {
+      const { error: delErr } = await supabase
+        .from('stickers')
+        .delete()
+        .eq('week', st.week);
 
-        // Caso contrário, salva/substitui
-        const { error } = await supabase.from('stickers').upsert(
-          {
-            week: st.week,
-            name,
-            image_url: imageUrl,
-            rarity
-          },
-          { onConflict: 'week' }
-        );
-        if (error) throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
+      if (delErr) {
+        throw new Error(`stickers delete week ${st.week}: ${delErr.message}`);
       }
+      continue;
     }
+
+    // Se veio imagem: salva ou substitui normalmente
+    const { error } = await supabase
+      .from('stickers')
+      .upsert(
+        {
+          week: st.week,
+          name: st.name || `Semana ${st.week}`,
+          image_url: imageUrl,
+          rarity: st.rarity || 'NORMAL'
+        },
+        { onConflict: 'week' }
+      );
+
+    if (error) {
+      throw new Error(`stickers upsert week ${st.week}: ${error.message}`);
+    }
+  }
+}
 
     // =========================
     // 5) student_stickers (UPSERT)
