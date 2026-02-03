@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://bumcjbjnkblzvrjpvafn.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+// Chaves reais forçadas para evitar erro 500 na Vercel
+const supabaseUrl = 'https://bumcjbjnkblzvrjpvafn.supabase.co';
+const supabaseKey = 'sb_secret_vv0rmziTgicFQs1v36ANjw_md444UQy';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req, res) {

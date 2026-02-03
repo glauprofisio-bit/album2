@@ -10,9 +10,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const url = process.env.SUPABASE_URL || 'https://bumcjbjnkblzvrjpvafn.supabase.co';
-    // Fallback temporário para garantir que o app funcione enquanto o usuário configura as env vars na Vercel
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || 'sb_secret_vv0rmziTgicFQs1v36ANjw_md444UQy';
+    // Chaves reais forçadas para evitar erro 500 na Vercel
+    const url = 'https://bumcjbjnkblzvrjpvafn.supabase.co';
+    const serviceKey = 'sb_secret_vv0rmziTgicFQs1v36ANjw_md444UQy';
 
     if (!url || !serviceKey) {
       return res.status(500).json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
