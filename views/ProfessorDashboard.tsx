@@ -168,6 +168,12 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-500">
+      <button
+  onClick={() => setIsAvatarPickerOpen(true)}
+  className="relative"
+>
+  <UserCircle size={32} />
+</button>
       {/* Header com Tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex bg-white/20 p-2 rounded-[2rem] border-4 border-indigo-950 shadow-lg">
