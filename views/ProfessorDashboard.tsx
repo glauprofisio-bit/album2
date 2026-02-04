@@ -564,6 +564,15 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         </div>
       )}
     </div>
+    {isAvatarPickerOpen && (
+  <AvatarPickerModal
+    onClose={() => setIsAvatarPickerOpen(false)}
+    onSelect={(updates) => {
+      onUpdateProfile?.(updates);
+      setIsAvatarPickerOpen(false);
+    }}
+  />
+)}
   );
 };
 
