@@ -72,7 +72,7 @@ return data.professors.find(p => p.id === user.professorId);
 
 const getTutorAvatarUrl = (t: User) => {
 if (t.avatarUrl) return t.avatarUrl;
-if (t.avatarSeed) return 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=${t.avatarSeed}';
+if (t.avatarSeed) return 'https://api.dicebear.com/9.x/bottts/svg?seed=${t.avatarSeed}';
 return null;
 };
 
