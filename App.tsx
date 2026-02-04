@@ -55,7 +55,7 @@ const App: React.FC = () => {
 
     // 3. Gerenciar a fila de salvamento
     if (isBusyRef.current) {
-      // Se já estiver salvando, apenas atualizamos o que precisa ser salvo na próxima rodada
+      // Se já estiver , apenas atualizamos o que precisa ser salvo na próxima rodada
       pendingUpdateRef.current = updatedData;
       return;
     }
@@ -173,6 +173,7 @@ setSyncError(null);
     ? 'Sincronizando...'
     : 'Sincronizado'}
 </span>
+          
         </div>
       </div>
     </div>
