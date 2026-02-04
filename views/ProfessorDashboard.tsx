@@ -1,12 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AppData, User, UserRole } from '../types';
 import {
   CheckCircle,
   Plus,
   LayoutGrid,
-  Users as UsersIcon,
   UserCircle,
-  Star,
   XCircle,
   BarChart3,
   Edit2,
@@ -26,7 +24,12 @@ interface ProfessorDashboardProps {
   onUpdateProfile?: (updates: Partial<User>) => void;
 }
 
-const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, updateData, onUpdateProfile }) => {
+const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
+  user,
+  data,
+  updateData,
+  onUpdateProfile
+}) => {
   const [activeTab, setActiveTab] = useState<'attendance' | 'classification'>('attendance');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [bulkStudents, setBulkStudents] = useState([{ name: '', login: '', password: '' }]);
@@ -40,7 +43,20 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
   const [sortOrder, setSortOrder] = useState<'presenca' | 'falta'>('falta');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  const myStudents = useMemo(() => data.students.filter(s => s.professorId === user.id), [data.students, user.id]);
+  // ✅ NOVO: rascunho de presença (pra clicar rápido sem salvar na hora)
+  const [draftStickers, setDraftStickers] = useState(data.studentStickers);
+  const [draftDirty, setDraftDirty] = useState(false);
+  const [isSavingAttendance, setIsSavingAttendance] = useState(false);
+
+  // Se vier dado novo da nuvem e você NÃO mexeu (não está "dirty"), sincroniza o rascunho
+  useEffect(() => {
+    if (!draftDirty) setDraftStickers(data.studentStickers);
+  }, [data.studentStickers, draftDirty]);
+
+  const myStudents = useMemo(
+    () => data.students.filter(s => s.professorId === user.id),
+    [data.students, user.id]
+  );
 
   const getAvatarUrl = (u: User) => {
     if (u.avatarUrl) return u.avatarUrl;
@@ -50,7 +66,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
   const handleAddBulkStudents = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const newStudents: User[] = bulkStudents
       .filter(s => s.name && s.login)
       .map(s => ({
@@ -68,8 +84,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     if (newStudents.length === 0) return;
 
     updateData({ students: [...data.students, ...newStudents] });
-    
-    // Reset
+
     setBulkStudents([{ name: '', login: '', password: '' }]);
     setBulkSerie('');
     setIsAddingStudent(false);
@@ -104,20 +119,18 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
   const handleDeleteStudent = async (studentId: string) => {
     if (!confirm('Deseja realmente excluir este aluno?')) return;
-    
-    // Filtra localmente primeiro para resposta rápida
+
     const updatedStudents = data.students.filter(s => s.id !== studentId);
     await updateData({ students: updatedStudents });
-    
-    // A função updateData agora já cuida do salvamento direto no Supabase
   };
 
+  // ✅ Agora só mexe no rascunho (NÃO salva na nuvem ao clicar)
   const toggleSticker = (alunoId: string, week: number) => {
-    const existingIndex = data.studentStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
-    let newStickers = [...data.studentStickers];
+    const existingIndex = draftStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
+    const newStickers = [...draftStickers];
 
     if (existingIndex === -1) {
-      // Estado: Nada -> Verde (Presença)
+      // Nada -> Presença (verde)
       newStickers.push({
         alunoId,
         week,
@@ -130,24 +143,37 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     } else {
       const sticker = newStickers[existingIndex];
       if (sticker.liberada && !sticker.isFalta) {
-        // Estado: Verde -> Vermelho (Falta)
+        // Verde -> Falta (vermelho)
         newStickers[existingIndex] = { ...sticker, liberada: false, isFalta: true };
       } else if (sticker.isFalta) {
-        // Estado: Vermelho -> Nada
+        // Vermelho -> Nada
         newStickers.splice(existingIndex, 1);
       } else {
-        // Fallback
+        // fallback -> Nada
         newStickers.splice(existingIndex, 1);
       }
     }
 
-    updateData({ studentStickers: newStickers });
+    setDraftStickers(newStickers);
+    setDraftDirty(true);
+  };
+
+  // ✅ Botão “Salvar presença” (manda tudo de uma vez)
+  const saveAttendance = async () => {
+    if (!draftDirty) return;
+    try {
+      setIsSavingAttendance(true);
+      await Promise.resolve(updateData({ studentStickers: draftStickers }));
+      setDraftDirty(false);
+    } finally {
+      setIsSavingAttendance(false);
+    }
   };
 
   const classificationData = useMemo(() => {
     return myStudents
       .map(student => {
-        const stickers = data.studentStickers.filter(s => s.alunoId === student.id);
+        const stickers = draftStickers.filter(s => s.alunoId === student.id);
         return {
           ...student,
           presencas: stickers.filter(s => s.liberada && !s.isFalta).length,
@@ -160,19 +186,16 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         return true;
       })
       .sort((a, b) => {
-        const valA = sortOrder === 'presenca' ? a.presencas : a.faltas;
-        const valB = sortOrder === 'presenca' ? b.presencas : b.faltas;
+        const valA = sortOrder === 'presenca' ? (a as any).presencas : (a as any).faltas;
+        const valB = sortOrder === 'presenca' ? (b as any).presencas : (b as any).faltas;
         return sortDirection === 'desc' ? valB - valA : valA - valB;
       });
-  }, [myStudents, data.studentStickers, filterCiclo, filterSerie, sortOrder, sortDirection]);
+  }, [myStudents, draftStickers, filterCiclo, filterSerie, sortOrder, sortDirection]);
 
   return (
     <>
       <div className="space-y-8 pb-12 animate-in fade-in duration-500">
-        <button
-          onClick={() => setIsAvatarPickerOpen(true)}
-          className="relative"
-        >
+        <button onClick={() => setIsAvatarPickerOpen(true)} className="relative">
           <UserCircle size={32} />
         </button>
 
@@ -182,7 +205,9 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
             <button
               onClick={() => setActiveTab('attendance')}
               className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] font-black uppercase italic tracking-tighter transition-all ${
-                activeTab === 'attendance' ? 'bg-white text-indigo-950 shadow-md scale-105' : 'text-white hover:bg-white/10'
+                activeTab === 'attendance'
+                  ? 'bg-white text-indigo-950 shadow-md scale-105'
+                  : 'text-white hover:bg-white/10'
               }`}
             >
               <LayoutGrid size={20} /> Painel de Presença
@@ -190,7 +215,9 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
             <button
               onClick={() => setActiveTab('classification')}
               className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] font-black uppercase italic tracking-tighter transition-all ${
-                activeTab === 'classification' ? 'bg-white text-indigo-950 shadow-md scale-105' : 'text-white hover:bg-white/10'
+                activeTab === 'classification'
+                  ? 'bg-white text-indigo-950 shadow-md scale-105'
+                  : 'text-white hover:bg-white/10'
               }`}
             >
               <BarChart3 size={20} /> Classificação
@@ -208,7 +235,10 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
         {activeTab === 'attendance' && (
           <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">Frequência da Turma</h2>
+              <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">
+                Frequência da Turma
+              </h2>
+
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded-full bg-green-500 border-2 border-indigo-950"></div>
@@ -225,9 +255,18 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
-                    <th className="py-4 px-4 text-left text-[10px] font-black uppercase tracking-widest text-indigo-400 border-b-2 border-slate-50 sticky left-0 bg-white z-30">Estudante</th>
+                    <th className="py-4 px-4 text-left text-[10px] font-black uppercase tracking-widest text-indigo-400 border-b-2 border-slate-50 sticky left-0 bg-white z-30">
+                      Estudante
+                    </th>
                     {Array.from({ length: 45 }, (_, i) => i + 1).map(w => (
-                      <th key={w} className={`py-4 px-2 text-center text-[10px] font-black uppercase tracking-widest border-b-2 border-slate-50 min-w-[50px] ${w === data.currentWeek ? 'text-indigo-950 bg-yellow-400/20 rounded-t-xl' : 'text-indigo-200'}`}>
+                      <th
+                        key={w}
+                        className={`py-4 px-2 text-center text-[10px] font-black uppercase tracking-widest border-b-2 border-slate-50 min-w-[50px] ${
+                          w === data.currentWeek
+                            ? 'text-indigo-950 bg-yellow-400/20 rounded-t-xl'
+                            : 'text-indigo-200'
+                        }`}
+                      >
                         S{w}
                       </th>
                     ))}
@@ -253,12 +292,19 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                           </div>
                         </div>
                       </td>
+
                       {Array.from({ length: 45 }, (_, i) => i + 1).map(w => {
-                        const sticker = data.studentStickers.find(s => s.alunoId === student.id && s.week === w);
+                        const sticker = draftStickers.find(s => s.alunoId === student.id && s.week === w);
                         const isVerde = sticker?.liberada && !sticker?.isFalta;
                         const isVermelho = sticker?.isFalta;
+
                         return (
-                          <td key={w} className={`py-4 px-1 border-b-2 border-slate-50 text-center ${w === data.currentWeek ? 'bg-yellow-50/20' : ''}`}>
+                          <td
+                            key={w}
+                            className={`py-4 px-1 border-b-2 border-slate-50 text-center ${
+                              w === data.currentWeek ? 'bg-yellow-50/20' : ''
+                            }`}
+                          >
                             <button
                               onClick={() => toggleSticker(student.id, w)}
                               className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center transition-all active:scale-90 border-4 ${
@@ -269,7 +315,13 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                                   : 'bg-slate-50 border-slate-200 text-slate-200 hover:border-indigo-400 hover:text-indigo-400'
                               }`}
                             >
-                              {isVerde ? <CheckCircle size={20} strokeWidth={4} /> : isVermelho ? <XCircle size={20} strokeWidth={4} /> : <div className="w-2 h-2 rounded-full bg-current" />}
+                              {isVerde ? (
+                                <CheckCircle size={20} strokeWidth={4} />
+                              ) : isVermelho ? (
+                                <XCircle size={20} strokeWidth={4} />
+                              ) : (
+                                <div className="w-2 h-2 rounded-full bg-current" />
+                              )}
                             </button>
                           </td>
                         );
@@ -279,13 +331,34 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                 </tbody>
               </table>
             </div>
+
+            {/* ✅ Botão de salvar no final */}
+            <div className="mt-6 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+              <div className="text-[10px] font-black uppercase tracking-widest text-indigo-950/60">
+                {draftDirty ? 'Você tem alterações não salvas' : 'Tudo salvo'}
+              </div>
+
+              <button
+                onClick={saveAttendance}
+                disabled={!draftDirty || isSavingAttendance}
+                className={`px-8 py-4 rounded-[2rem] font-black uppercase italic tracking-tighter border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] transition-all active:translate-y-1 active:shadow-none ${
+                  !draftDirty || isSavingAttendance
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-green-500 hover:bg-green-600 text-white'
+                }`}
+              >
+                {isSavingAttendance ? 'Salvando...' : 'Salvar presença'}
+              </button>
+            </div>
           </div>
         )}
 
         {activeTab === 'classification' && (
           <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-              <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">Classificação da Turma</h2>
+              <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">
+                Classificação da Turma
+              </h2>
 
               <div className="flex items-center gap-2 bg-indigo-950/5 px-4 py-3 rounded-[1.5rem] border-2 border-indigo-950/10">
                 <Filter size={16} className="text-indigo-950" />
@@ -293,7 +366,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
               </div>
             </div>
 
-            {/* Controles */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
               <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Ciclo</label>
@@ -344,8 +416,11 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {classificationData.map((s, idx) => (
-                <div key={s.id} className="bg-white rounded-[2.5rem] p-6 border-4 border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] relative group hover:-translate-y-1 transition-all">
+              {classificationData.map((s: any, idx) => (
+                <div
+                  key={s.id}
+                  className="bg-white rounded-[2.5rem] p-6 border-4 border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)] relative group hover:-translate-y-1 transition-all"
+                >
                   <div className="absolute -top-4 -left-4 w-12 h-12 bg-indigo-950 text-white rounded-2xl flex items-center justify-center font-black italic text-xl shadow-lg border-4 border-white rotate-[-12deg] group-hover:rotate-0 transition-all">
                     #{idx + 1}
                   </div>
