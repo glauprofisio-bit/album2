@@ -392,6 +392,47 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
           <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
               <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">
+                <div className="mt-6 mb-8 bg-slate-50 rounded-[3rem] border-[6px] border-indigo-950 p-6 shadow-[0_8px_0_0_rgba(30,27,75,1)]">
+  <h3 className="text-xl font-black uppercase italic tracking-tighter text-indigo-950 mb-4">
+    Lista de alunos
+  </h3>
+
+  <div className="space-y-3">
+    {myStudents.map(s => (
+      <div
+        key={s.id}
+        className="flex items-center justify-between gap-4 bg-white rounded-[2rem] p-4 border-4 border-indigo-950"
+      >
+        <div className="min-w-0">
+          <div className="font-black text-indigo-950 uppercase italic truncate">
+            {s.name}
+          </div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mt-1">
+            {s.serie || '—'} | {s.ciclo || '—'}
+          </div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mt-2 break-all">
+            Login: {s.login} {s.password ? `| Senha: ${s.password}` : '| Senha: —'}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => handleDeleteStudent(s.id)}
+          className="flex-shrink-0 px-4 py-3 rounded-2xl border-4 border-indigo-950 bg-red-500 text-white font-black uppercase italic tracking-tighter shadow-[0_4px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all"
+        >
+          Excluir
+        </button>
+      </div>
+    ))}
+
+    {myStudents.length === 0 && (
+      <div className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
+        Nenhum aluno cadastrado para este professor.
+      </div>
+    )}
+  </div>
+</div>
+
                 Classificação
               </h2>
 
@@ -553,8 +594,8 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
                 <input
                   value={bulkSerie}
                   onChange={(e) => setBulkSerie(e.target.value)}
-                  placeholder="Série"
-                  className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+                  placeholder="Série (ex: 6A)"
+                  className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest text-indigo-950 placeholder-indigo-400 bg-white"
                   required
                 />
 
@@ -584,21 +625,21 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
                       value={s.name}
                       onChange={(e) => updateBulkStudent(idx, 'name', e.target.value)}
                       placeholder="Nome"
-                      className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+                      className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest text-indigo-950 placeholder-indigo-400 bg-white"
                       required
                     />
                     <input
                       value={s.login}
                       onChange={(e) => updateBulkStudent(idx, 'login', e.target.value)}
                       placeholder="Login"
-                      className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+                      className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest text-indigo-950 placeholder-indigo-400 bg-white"
                       required
                     />
                     <input
                       value={s.password}
                       onChange={(e) => updateBulkStudent(idx, 'password', e.target.value)}
                       placeholder="Senha"
-                      className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+                      className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest text-indigo-950 placeholder-indigo-400 bg-white"
                     />
 
                     <button
@@ -673,7 +714,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
               <input
                 value={editingStudentForm.serie || ''}
                 onChange={(e) => setEditingStudentForm(v => ({ ...v, serie: e.target.value }))}
-                placeholder="Série"
+                placeholder="Série (ex: 6A)"
                 className="w-full px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
               />
               <select
