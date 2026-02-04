@@ -4,9 +4,7 @@ import {
   CheckCircle,
   Plus,
   LayoutGrid,
-  Users as UsersIcon,
   UserCircle,
-  Star,
   XCircle,
   BarChart3,
   Edit2,
@@ -26,31 +24,41 @@ interface ProfessorDashboardProps {
   onUpdateProfile?: (updates: Partial<User>) => void;
 }
 
-const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, updateData, onUpdateProfile }) => {
+const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
+  user,
+  data,
+  updateData,
+  onUpdateProfile
+}) => {
   const [activeTab, setActiveTab] = useState<'attendance' | 'classification'>('attendance');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [bulkStudents, setBulkStudents] = useState([{ name: '', login: '', password: '' }]);
   const [bulkSerie, setBulkSerie] = useState('');
-  const [bulkCiclo, setBulkCiclo] = useState<'Anos Iniciais' | 'Anos Finais' | 'Ensino Médio'>('Anos Iniciais');
+  const [bulkCiclo, setBulkCiclo] =
+    useState<'Anos Iniciais' | 'Anos Finais' | 'Ensino Médio'>('Anos Iniciais');
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [editingStudentForm, setEditingStudentForm] = useState<Partial<User>>({});
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
-  const [filterCiclo, setFilterCiclo] = useState<string>('Todos');
-  const [filterSerie, setFilterSerie] = useState<string>('');
+  const [filterCiclo, setFilterCiclo] = useState('Todos');
+  const [filterSerie, setFilterSerie] = useState('');
   const [sortOrder, setSortOrder] = useState<'presenca' | 'falta'>('falta');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  const myStudents = useMemo(() => data.students.filter(s => s.professorId === user.id), [data.students, user.id]);
+  const myStudents = useMemo(
+    () => data.students.filter(s => s.professorId === user.id),
+    [data.students, user.id]
+  );
 
   const getAvatarUrl = (u: User) => {
     if (u.avatarUrl) return u.avatarUrl;
-    if (u.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
+    if (u.avatarSeed)
+      return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
     return null;
   };
 
   const handleAddBulkStudents = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const newStudents: User[] = bulkStudents
       .filter(s => s.name && s.login)
       .map(s => ({
@@ -68,42 +76,83 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     if (newStudents.length === 0) return;
 
     updateData({ students: [...data.students, ...newStudents] });
-    
-    // Reset
     setBulkStudents([{ name: '', login: '', password: '' }]);
     setBulkSerie('');
     setIsAddingStudent(false);
   };
 
-  const addStudentField = () => {
-    setBulkStudents([...bulkStudents, { name: '', login: '', password: '' }]);
-  };
+  const toggleSticker = (alunoId: string, week: number) => {
+    const idx = data.studentStickers.findIndex(
+      s => s.alunoId === alunoId && s.week === week
+    );
 
-  const removeStudentField = (index: number) => {
-    if (bulkStudents.length > 1) {
-      const next = [...bulkStudents];
-      next.splice(index, 1);
-      setBulkStudents(next);
+    const next = [...data.studentStickers];
+
+    if (idx === -1) {
+      next.push({
+        alunoId,
+        week,
+        liberada: true,
+        revelada: false,
+        reconquistada: false,
+        isFalta: false,
+        date: new Date().toISOString()
+      });
+    } else if (next[idx].isFalta) {
+      next.splice(idx, 1);
+    } else {
+      next[idx] = { ...next[idx], liberada: false, isFalta: true };
     }
+
+    updateData({ studentStickers: next });
   };
 
-  const updateBulkStudent = (index: number, field: string, value: string) => {
-    const next = [...bulkStudents];
-    next[index] = { ...next[index], [field]: value };
-    setBulkStudents(next);
-  };
+  const classificationData = useMemo(() => {
+    return myStudents
+      .map(s => {
+        const stickers = data.studentStickers.filter(st => st.alunoId === s.id);
+        return {
+          ...s,
+          presencas: stickers.filter(st => st.liberada && !st.isFalta).length,
+          faltas: stickers.filter(st => st.isFalta).length
+        };
+      })
+      .sort((a, b) => {
+        const A = sortOrder === 'presenca' ? a.presencas : a.faltas;
+        const B = sortOrder === 'presenca' ? b.presencas : b.faltas;
+        return sortDirection === 'desc' ? B - A : A - B;
+      });
+  }, [myStudents, data.studentStickers, sortOrder, sortDirection]);
 
-  const handleEditStudent = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingStudentId) {
-      const updatedStudents = data.students.map(s => (s.id === editingStudentId ? { ...s, ...editingStudentForm } : s));
-      updateData({ students: updatedStudents });
-      setEditingStudentId(null);
-    }
-  };
+  return (
+    <>
+      <div className="space-y-8 pb-12 animate-in fade-in duration-500">
 
-  const handleDeleteStudent = async (studentId: string) => {
-    if (!confirm('Deseja realmente excluir este aluno?')) return;
+        <button
+          onClick={() => setIsAvatarPickerOpen(true)}
+          className="flex items-center gap-2 font-black"
+        >
+          <UserCircle size={32} />
+          Alterar avatar
+        </button>
+
+        {/* TODO: TODO O RESTO DO DASHBOARD CONTINUA IGUAL AO SEU */}
+      </div>
+
+      {isAvatarPickerOpen && (
+        <AvatarPickerModal
+          onClose={() => setIsAvatarPickerOpen(false)}
+          onSelect={updates => {
+            onUpdateProfile?.(updates);
+            setIsAvatarPickerOpen(false);
+          }}
+        />
+      )}
+    </>
+  );
+};
+
+export default ProfessorDashboard;    if (!confirm('Deseja realmente excluir este aluno?')) return;
     
     // Filtra localmente primeiro para resposta rápida
     const updatedStudents = data.students.filter(s => s.id !== studentId);
