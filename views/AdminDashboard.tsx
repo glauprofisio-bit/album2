@@ -325,10 +325,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-center gap-2 text-white/80 font-black uppercase tracking-widest text-[10px]">
-        <Cloud size={14} />
-        {isSyncing ? 'Salvando na nuvem...' : 'Sincronizado'}
-      </div>
 
       <div className="flex bg-indigo-950 p-2 rounded-[2rem] gap-2 border-4 border-white/20 shadow-xl">
         <button
