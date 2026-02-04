@@ -17,6 +17,7 @@ import {
   Minus
 } from 'lucide-react';
 import AvatarPickerModal from './AvatarPickerModal';
+import { deleteStudent } from '../db';
 const makeId = () => {
   try {
     return crypto.randomUUID();
@@ -129,10 +130,25 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
   };
 
   const handleDeleteStudent = async (studentId: string) => {
-    if (!confirm('Deseja realmente excluir este aluno?')) return;
-    const updatedStudents = data.students.filter(s => s.id !== studentId);
-    await Promise.resolve(updateData({ students: updatedStudents }));
-  };
+  if (!confirm('Deseja realmente excluir este aluno?')) return;
+
+  // 1) Apaga na tabela students do Supabase
+  try {
+    await deleteStudent(studentId);
+  } catch (e) {
+    console.error('Erro ao deletar aluno no Supabase:', e);
+  }
+
+  // 2) Remove do AppData (tela + salvamento)
+  const updatedStudents = data.students.filter(s => s.id !== studentId);
+
+  // 3) Remove também as presenças/figurinhas do aluno
+  const updatedStudentStickers = data.studentStickers.filter(st => st.alunoId !== studentId);
+
+  await Promise.resolve(
+    updateData({ students: updatedStudents, studentStickers: updatedStudentStickers })
+  );
+};
 
   // ✅ Agora só mexe no rascunho (não salva na nuvem ao clicar)
   const toggleSticker = (alunoId: string, week: number) => {
