@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'ranking'>('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [cloudError, setCloudError] = useState(false);
 
   const isBusyRef = useRef(false);
   const pendingUpdateRef = useRef<AppData | null>(null);
@@ -65,7 +66,9 @@ const App: React.FC = () => {
     const trySave = async (dataToSave: AppData) => {
       try {
         const result = await saveData(dataToSave);
-        if (!result.success) throw new Error(result.error || 'Falha no salvamento');
+if (!result.success) throw new Error(result.error || 'Falha no salvamento');
+
+setSyncError(null);
         
         if (pendingUpdateRef.current) {
           const nextData = pendingUpdateRef.current;
@@ -76,9 +79,9 @@ const App: React.FC = () => {
   console.error('Erro ao salvar dados:', e);
 
   pendingUpdateRef.current = null;
-
-  alert('Estamos configurando as novas figurinhas. Tente novamente em instantes.');
+  setCloudError('Estamos configurando o site ou preparando novas figurinhas. Vamos treinar a paciência e voltar mais tarde, ok?);
 }
+
     };
 
     try {
@@ -160,14 +163,16 @@ const App: React.FC = () => {
             {currentUser.name}
           </span>
 
-          <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-indigo-500">
-            <Cloud size={12} />
-            {isSaving
-              ? 'Salvando...'
-              : isSyncing
-              ? 'Sincronizando...'
-              : 'Sincronizado'}
-          </span>
+         <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-indigo-500">
+  <Cloud size={12} />
+  {syncError
+    ? syncError
+    : isSaving
+    ? 'Salvando...'
+    : isSyncing
+    ? 'Sincronizando...'
+    : 'Sincronizado'}
+</span>
         </div>
       </div>
     </div>
