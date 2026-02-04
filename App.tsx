@@ -37,7 +37,8 @@ const App: React.FC = () => {
       } else {
         throw new Error('Falha no sync');
       }
-    } catch {
+    } catch (e) {
+      console.error('Erro na sincronização:', e);
       setCloudMessage('Estamos configurando as novas figurinhas. Tente novamente em instantes.');
     } finally {
       if (showLoader) setIsSyncing(false);
@@ -64,16 +65,19 @@ const App: React.FC = () => {
     const trySave = async (payload: AppData) => {
       try {
         const result = await saveData(payload);
-        if (!result.success) throw new Error();
+        if (!result.success) throw new Error(result.error || 'Falha no salvamento');
 
         if (pendingUpdateRef.current) {
           const next = pendingUpdateRef.current;
           pendingUpdateRef.current = null;
           await trySave(next);
         }
-      } catch {
+      } catch (e) {
+        console.error('Erro ao salvar:', e);
         pendingUpdateRef.current = null;
-        setCloudMessage('Derrubaram um balde de cola nas figurinhas! 🎨 A Rita já pegou o culpado no flagra e está supervisionando a limpeza para a mágica voltar. Tente de novo em breve!');
+        setCloudMessage(
+          'Derrubaram um balde de cola nas figurinhas! 🎨 A Rita já pegou o culpado no flagra e está supervisionando a limpeza para a mágica voltar. Tente de novo em breve!'
+        );
       }
     };
 
@@ -98,10 +102,10 @@ const App: React.FC = () => {
     return user;
   }, [user, data]);
 
+  // ✅ CORRIGIDO: template string com crase
   const getAvatarUrl = (u: User) =>
-    u.avatarUrl || (u.avatarSeed
-      ? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`
-      : null);
+    u.avatarUrl ||
+    (u.avatarSeed ? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}` : null);
 
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
@@ -111,24 +115,18 @@ const App: React.FC = () => {
         <>
           <header className="p-4 sticky top-0 z-50">
             <div className="max-w-6xl mx-auto bg-white rounded-[2rem] p-3 flex justify-between items-center border-[6px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)]">
-
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() =>
-                    setCurrentView(currentView === 'dashboard' ? 'ranking' : 'dashboard')
-                  }
+                  onClick={() => setCurrentView(currentView === 'dashboard' ? 'ranking' : 'dashboard')}
                   className="bg-indigo-600 text-white p-2 rounded-xl border-4 border-indigo-950"
                 >
-                  {currentView === 'dashboard'
-                    ? <Trophy size={20} />
-                    : <LayoutDashboard size={20} />}
+                  {currentView === 'dashboard' ? <Trophy size={20} /> : <LayoutDashboard size={20} />}
                 </button>
 
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg border-4 border-indigo-950 overflow-hidden relative bg-slate-100">
-                    {getAvatarUrl(currentUser) && (
-                      <img src={getAvatarUrl(currentUser)!} alt="avatar" />
-                    )}
+                    {getAvatarUrl(currentUser) && <img src={getAvatarUrl(currentUser)!} alt="avatar" />}
+
                     {(isSyncing || isSaving) && (
                       <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
                         <RefreshCw size={14} className="animate-spin text-indigo-600" />
@@ -137,9 +135,7 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="flex flex-col leading-tight">
-                    <span className="font-black uppercase text-xs text-indigo-950">
-                      {currentUser.name}
-                    </span>
+                    <span className="font-black uppercase text-xs text-indigo-950">{currentUser.name}</span>
 
                     <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-indigo-500">
                       <Cloud size={12} />
@@ -173,183 +169,6 @@ const App: React.FC = () => {
               <ProfessorDashboard user={currentUser} data={data} updateData={updateData} />
             ) : (
               <StudentDashboard user={currentUser} data={data} updateData={updateData} />
-            )}
-          </main>
-        </>
-      )}
-    </div>
-  );
-};
-
-export default App;
-      if (showLoader) setIsSyncing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    performSync(true);
-  }, [performSync]);
-
-  const updateData = async (newData: Partial<AppData>) => {
-    const updatedData = { ...data, ...newData };
-    setData(updatedData);
-
-    if (isBusyRef.current) {
-      pendingUpdateRef.current = updatedData;
-      return;
-    }
-
-    isBusyRef.current = true;
-    setIsSaving(true);
-
-    const trySave = async (dataToSave: AppData) => {
-      try {
-        const result = await saveData(dataToSave);
-        if (!result.success) {
-          throw new Error(result.error || 'Falha no salvamento');
-        }
-
-        setCloudError(null);
-
-        if (pendingUpdateRef.current) {
-          const nextData = pendingUpdateRef.current;
-          pendingUpdateRef.current = null;
-          await trySave(nextData);
-        }
-      } catch (e) {
-        console.error('Erro ao salvar dados:', e);
-        pendingUpdateRef.current = null;
-        setCloudError('Estamos configurando as novas figurinhas. Tente novamente em instantes.');
-      }
-    };
-
-    try {
-      await trySave(updatedData);
-    } finally {
-      isBusyRef.current = false;
-      setIsSaving(false);
-    }
-  };
-
-  const currentUser = useMemo(() => {
-    if (!user) return null;
-
-    if (user.id === 'admin') return { ...user, role: UserRole.ADMIN };
-
-    const prof = data.professors.find(p => p.id === user.id);
-    if (prof) return { ...prof, role: UserRole.PROFESSOR };
-
-    const student = data.students.find(s => s.id === user.id);
-    if (student) return { ...student, role: UserRole.ALUNO };
-
-    return user;
-  }, [user, data.professors, data.students]);
-
-  const getAvatarUrl = (u: User) =>
-    u.avatarUrl ||
-    (u.avatarSeed
-      ? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`
-      : null);
-
-  const updateCurrentProfile = async (updates: Partial<User>) => {
-    if (!currentUser) return;
-
-    if (currentUser.role === UserRole.PROFESSOR) {
-      const next = data.professors.map(p =>
-        p.id === currentUser.id ? { ...p, ...updates } : p
-      );
-      await updateData({ professors: next });
-      setUser({ ...currentUser, ...updates });
-      return;
-    }
-
-    if (currentUser.role === UserRole.ALUNO) {
-      const next = data.students.map(s =>
-        s.id === currentUser.id ? { ...s, ...updates } : s
-      );
-      await updateData({ students: next });
-      setUser({ ...currentUser, ...updates });
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
-      {!currentUser ? (
-        <Login onLogin={setUser} appData={data} />
-      ) : (
-        <>
-          <header className="p-4 sticky top-0 z-50">
-            <div className="max-w-6xl mx-auto bg-white rounded-[2rem] p-3 flex justify-between items-center border-[6px] border-indigo-950 shadow-[0_8px_0_0_rgba(30,27,75,1)]">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() =>
-                    setCurrentView(currentView === 'dashboard' ? 'ranking' : 'dashboard')
-                  }
-                  className="bg-indigo-600 text-white p-2 rounded-xl border-4 border-indigo-950"
-                >
-                  {currentView === 'dashboard' ? <Trophy size={20} /> : <LayoutDashboard size={20} />}
-                </button>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg border-4 border-indigo-950 overflow-hidden relative bg-slate-100">
-                    {getAvatarUrl(currentUser) && (
-                      <img src={getAvatarUrl(currentUser)!} alt="avatar" />
-                    )}
-
-                    {(isSyncing || isSaving) && (
-                      <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
-                        <RefreshCw size={14} className="animate-spin text-indigo-600" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col leading-tight">
-                    <span className="font-black uppercase text-xs text-indigo-950">
-                      {currentUser.name}
-                    </span>
-
-                    <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-indigo-500">
-                      <Cloud size={12} />
-                      {cloudError
-                        ? cloudError
-                        : isSaving
-                        ? 'Salvando...'
-                        : isSyncing
-                        ? 'Sincronizando...'
-                        : 'Sincronizado'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setUser(null)}
-                className="bg-red-500 p-2 rounded-xl border-4 border-indigo-950 text-white"
-              >
-                <LogOut size={20} />
-              </button>
-            </div>
-          </header>
-
-          <main className="flex-1 w-full max-w-6xl mx-auto p-4">
-            {currentView === 'ranking' ? (
-              <HallOfFame data={data} onClose={() => setCurrentView('dashboard')} />
-            ) : currentUser.role === UserRole.ADMIN ? (
-              <AdminDashboard data={data} updateData={updateData} />
-            ) : currentUser.role === UserRole.PROFESSOR ? (
-              <ProfessorDashboard
-                user={currentUser}
-                data={data}
-                updateData={updateData}
-                onUpdateProfile={updateCurrentProfile}
-              />
-            ) : (
-              <StudentDashboard
-                user={currentUser}
-                data={data}
-                updateData={updateData}
-                onUpdateProfile={updateCurrentProfile}
-              />
             )}
           </main>
         </>
