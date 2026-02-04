@@ -57,9 +57,5 @@ export async function saveData(
 
 // Nova função para deletar aluno diretamente no Supabase
 export async function deleteStudent(studentId: string): Promise<void> {
-  if (studentId.includes('-')) {
-    await supabase.from('students').delete().eq('id', studentId);
-  } else {
-    await supabase.from('students').delete().eq('login', studentId);
-  }
+  await supabase.from('students').delete().eq('id', studentId);
 }
