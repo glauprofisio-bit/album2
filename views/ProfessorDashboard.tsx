@@ -54,7 +54,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     const newStudents: User[] = bulkStudents
       .filter(s => s.name && s.login)
       .map(s => ({
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         name: s.name,
         email: '',
         login: s.login,
