@@ -17,6 +17,13 @@ import {
   Minus
 } from 'lucide-react';
 import AvatarPickerModal from './AvatarPickerModal';
+const makeId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+};
 
 interface ProfessorDashboardProps {
   user: User;
