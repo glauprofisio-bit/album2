@@ -472,7 +472,9 @@ return (
 <div className="bg-white rounded-[3rem] p-8 md:p-10 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] flex flex-col md:flex-row items-center gap-8 md:gap-12">
 <div onClick={() => setIsAvatarPickerOpen(true)} className="relative group cursor-pointer">
 <div
-className={w-32 h-32 md:w-40 md:h-40 bg-slate-100 rounded-full border-[6px] shadow-xl overflow-hidden relative transition-transform group-hover:scale-105 active:scale-95 ${   isUnstoppable ? 'border-orange-500' : 'border-indigo-950'   }}
+className={`w-32 h-32 md:w-40 md:h-40 bg-slate-100 rounded-full border-[6px] shadow-xl overflow-hidden relative transition-transform group-hover:scale-105 active:scale-95 ${
+  isUnstoppable ? 'border-orange-500' : 'border-indigo-950'
+}`}
 >
 {avatarDisplayUrl ? (
 <img src={avatarDisplayUrl} className="w-full h-full object-cover" />
