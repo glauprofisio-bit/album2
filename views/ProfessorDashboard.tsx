@@ -380,12 +380,325 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
           </div>
         )}
 
-        {/* O resto do seu dashboard (classification + modais) continua como estava */}
-        {/* ... (mantém tudo igual abaixo, sem cortes) */}
+        {/* CLASSIFICAÇÃO */}
+        {activeTab === 'classification' && (
+          <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+              <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">
+                Classificação
+              </h2>
 
-        {/* AQUI está o seu bloco de classificação e modais, sem mexer */}
-        {/* (Seu arquivo já tem isso completo; se você colar este arquivo inteiro, está tudo incluído) */}
+              <div className="flex flex-wrap items-center gap-3">
+                <select
+                  value={filterCiclo}
+                  onChange={(e) => setFilterCiclo(e.target.value)}
+                  className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest bg-white"
+                >
+                  <option value="Todos">Todos</option>
+                  <option value="Anos Iniciais">Anos Iniciais</option>
+                  <option value="Anos Finais">Anos Finais</option>
+                  <option value="Ensino Médio">Ensino Médio</option>
+                </select>
+
+                <input
+                  value={filterSerie}
+                  onChange={(e) => setFilterSerie(e.target.value)}
+                  placeholder="Filtrar série"
+                  className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest bg-white w-44"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setSortOrder(sortOrder === 'falta' ? 'presenca' : 'falta')}
+                  className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest bg-yellow-400 text-indigo-950"
+                  title="Trocar critério"
+                >
+                  {sortOrder === 'falta' ? 'Ordenar por faltas' : 'Ordenar por presenças'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                  className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest bg-indigo-600 text-white"
+                  title="Trocar direção"
+                >
+                  {sortDirection === 'desc' ? <ArrowDownAZ size={18} /> : <ArrowUpAZ size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto pb-4 custom-scrollbar">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="py-4 px-4 text-left text-[10px] font-black uppercase tracking-widest text-indigo-400 border-b-2 border-slate-50">
+                      Estudante
+                    </th>
+                    <th className="py-4 px-4 text-center text-[10px] font-black uppercase tracking-widest text-indigo-400 border-b-2 border-slate-50">
+                      Presenças
+                    </th>
+                    <th className="py-4 px-4 text-center text-[10px] font-black uppercase tracking-widest text-indigo-400 border-b-2 border-slate-50">
+                      Faltas
+                    </th>
+                    <th className="py-4 px-4 text-center text-[10px] font-black uppercase tracking-widest text-indigo-400 border-b-2 border-slate-50">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {classificationData.map((s: any) => (
+                    <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-4 px-4 font-black text-indigo-950 border-b-2 border-slate-50 uppercase italic text-[13px] tracking-tighter">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg border-2 border-indigo-950 overflow-hidden bg-slate-100 flex-shrink-0">
+                            {getAvatarUrl(s) ? (
+                              <img src={getAvatarUrl(s)!} className="w-full h-full object-cover" alt="avatar" />
+                            ) : (
+                              <UserCircle className="text-slate-300" />
+                            )}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="truncate">{s.name}</span>
+                            <span className="text-[7px] text-indigo-400 leading-none">
+                              {s.serie} | {s.ciclo}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-4 text-center border-b-2 border-slate-50">
+                        <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border-4 border-indigo-950 bg-green-500 text-white font-black text-[10px] uppercase tracking-widest">
+                          <CheckCircle size={16} strokeWidth={3} /> {s.presencas}
+                        </span>
+                      </td>
+
+                      <td className="py-4 px-4 text-center border-b-2 border-slate-50">
+                        <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border-4 border-indigo-950 bg-red-500 text-white font-black text-[10px] uppercase tracking-widest">
+                          <XCircle size={16} strokeWidth={3} /> {s.faltas}
+                        </span>
+                      </td>
+
+                      <td className="py-4 px-4 text-center border-b-2 border-slate-50">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingStudentId(s.id);
+                              setEditingStudentForm({
+                                name: s.name,
+                                login: s.login,
+                                password: s.password,
+                                serie: s.serie,
+                                ciclo: s.ciclo
+                              });
+                            }}
+                            className="px-4 py-2 rounded-2xl border-4 border-indigo-950 bg-yellow-400 text-indigo-950 font-black uppercase italic tracking-tighter shadow-[0_4px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all"
+                            title="Editar aluno"
+                          >
+                            <Edit2 size={16} strokeWidth={3} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStudent(s.id)}
+                            className="px-4 py-2 rounded-2xl border-4 border-indigo-950 bg-red-500 text-white font-black uppercase italic tracking-tighter shadow-[0_4px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all"
+                            title="Excluir aluno"
+                          >
+                            <Trash2 size={16} strokeWidth={3} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {classificationData.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-10 text-center text-indigo-300 font-black uppercase tracking-widest text-[10px]">
+                        Nenhum aluno encontrado (verifique filtros, ciclo, série e professorId)
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* MODAL CADASTRAR ALUNOS */}
+      {isAddingStudent && (
+        <div className="fixed inset-0 bg-indigo-950/90 backdrop-blur-xl z-[4000] flex items-center justify-center p-6" onClick={() => setIsAddingStudent(false)}>
+          <div className="bg-white rounded-[4rem] w-full max-w-2xl p-10 border-[8px] border-indigo-950 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-3xl font-black text-indigo-950 uppercase italic tracking-tighter">Cadastrar alunos</h3>
+              <button
+                type="button"
+                onClick={() => setIsAddingStudent(false)}
+                className="p-3 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl"
+              >
+                <X size={20} strokeWidth={4} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddBulkStudents} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input
+                  value={bulkSerie}
+                  onChange={(e) => setBulkSerie(e.target.value)}
+                  placeholder="Série"
+                  className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+                  required
+                />
+
+                <select
+                  value={bulkCiclo}
+                  onChange={(e) => setBulkCiclo(e.target.value as any)}
+                  className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest bg-white"
+                >
+                  <option value="Anos Iniciais">Anos Iniciais</option>
+                  <option value="Anos Finais">Anos Finais</option>
+                  <option value="Ensino Médio">Ensino Médio</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={addStudentField}
+                  className="px-6 py-3 rounded-2xl border-4 border-indigo-950 bg-indigo-600 text-white font-black uppercase italic tracking-tighter shadow-[0_6px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus size={18} strokeWidth={3} /> Adicionar linha
+                </button>
+              </div>
+
+              <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2 custom-scrollbar">
+                {bulkStudents.map((s, idx) => (
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
+                    <input
+                      value={s.name}
+                      onChange={(e) => updateBulkStudent(idx, 'name', e.target.value)}
+                      placeholder="Nome"
+                      className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+                      required
+                    />
+                    <input
+                      value={s.login}
+                      onChange={(e) => updateBulkStudent(idx, 'login', e.target.value)}
+                      placeholder="Login"
+                      className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+                      required
+                    />
+                    <input
+                      value={s.password}
+                      onChange={(e) => updateBulkStudent(idx, 'password', e.target.value)}
+                      placeholder="Senha"
+                      className="px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => removeStudentField(idx)}
+                      className="px-4 py-3 rounded-2xl border-4 border-indigo-950 bg-slate-100 text-indigo-950 font-black uppercase italic tracking-tighter flex items-center justify-center gap-2"
+                      title="Remover linha"
+                    >
+                      <Minus size={18} strokeWidth={3} /> Remover
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingStudent(false)}
+                  className="px-8 py-4 rounded-[2rem] border-4 border-indigo-950 bg-slate-200 text-indigo-950 font-black uppercase italic tracking-tighter"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-8 py-4 rounded-[2rem] border-4 border-indigo-950 bg-yellow-400 text-indigo-950 font-black uppercase italic tracking-tighter shadow-[0_6px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all"
+                >
+                  Salvar alunos
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITAR ALUNO */}
+      {editingStudentId && (
+        <div className="fixed inset-0 bg-indigo-950/90 backdrop-blur-xl z-[4000] flex items-center justify-center p-6" onClick={() => setEditingStudentId(null)}>
+          <div className="bg-white rounded-[4rem] w-full max-w-lg p-10 border-[8px] border-indigo-950 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-3xl font-black text-indigo-950 uppercase italic tracking-tighter">Editar aluno</h3>
+              <button
+                type="button"
+                onClick={() => setEditingStudentId(null)}
+                className="p-3 bg-red-500 rounded-2xl text-white border-4 border-indigo-950 shadow-xl"
+              >
+                <X size={20} strokeWidth={4} />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditStudent} className="space-y-4">
+              <input
+                value={editingStudentForm.name || ''}
+                onChange={(e) => setEditingStudentForm(v => ({ ...v, name: e.target.value }))}
+                placeholder="Nome"
+                className="w-full px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+                required
+              />
+              <input
+                value={editingStudentForm.login || ''}
+                onChange={(e) => setEditingStudentForm(v => ({ ...v, login: e.target.value }))}
+                placeholder="Login"
+                className="w-full px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+                required
+              />
+              <input
+                value={editingStudentForm.password || ''}
+                onChange={(e) => setEditingStudentForm(v => ({ ...v, password: e.target.value }))}
+                placeholder="Senha"
+                className="w-full px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+              />
+              <input
+                value={editingStudentForm.serie || ''}
+                onChange={(e) => setEditingStudentForm(v => ({ ...v, serie: e.target.value }))}
+                placeholder="Série"
+                className="w-full px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest"
+              />
+              <select
+                value={(editingStudentForm.ciclo as any) || 'Anos Iniciais'}
+                onChange={(e) => setEditingStudentForm(v => ({ ...v, ciclo: e.target.value as any }))}
+                className="w-full px-4 py-3 rounded-2xl border-4 border-indigo-950 font-black text-[10px] uppercase tracking-widest bg-white"
+              >
+                <option value="Anos Iniciais">Anos Iniciais</option>
+                <option value="Anos Finais">Anos Finais</option>
+                <option value="Ensino Médio">Ensino Médio</option>
+              </select>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingStudentId(null)}
+                  className="px-8 py-4 rounded-[2rem] border-4 border-indigo-950 bg-slate-200 text-indigo-950 font-black uppercase italic tracking-tighter"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-8 py-4 rounded-[2rem] border-4 border-indigo-950 bg-green-500 text-white font-black uppercase italic tracking-tighter shadow-[0_6px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all"
+                >
+                  Salvar edição
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {isAvatarPickerOpen && (
         <AvatarPickerModal
