@@ -56,7 +56,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
   }, [data.studentStickers, draftDirty]);
 
   const myStudents = useMemo(
-    () => data.students.filter(s => s.professorId === user.id),
+    () => data.students.filter(s => String(s.professorId) === String(user.id)),
     [data.students, user.id]
   );
 
@@ -72,7 +72,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
     const newStudents: User[] = bulkStudents
       .filter(s => s.name && s.login)
       .map(s => ({
-        id: crypto.randomUUID(),
+        id: makeId(),
         name: s.name,
         email: '',
         login: s.login,
