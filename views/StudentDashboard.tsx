@@ -1,5 +1,3 @@
-// StudentDashboard.tsx (parte 1/3)
-
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { AppData, User, AlunoSticker, Sticker as StickerType, StickerRarity } from '../types';
 import { Lock, X, Star, Trophy, Sparkles, UserCircle, Puzzle, Flame } from 'lucide-react';
@@ -563,7 +561,7 @@ className={w-32 h-32 md:w-40 md:h-40 bg-slate-100 rounded-full border-[6px] shad
         PRESENÇA NAS REUNIÕES (4 PARTES)  
       </div>  
     </div>  
-  </div> // StudentDashboard.tsx (parte 3/3)  
+ </div>
 
   {/* modal raspadinha real */}  
   {scratchingSticker && (  
