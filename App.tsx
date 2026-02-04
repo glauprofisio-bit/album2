@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 🔴 STATUS REAL DA NUVEM
+  // status real da nuvem
   const [cloudMessage, setCloudMessage] = useState<string | null>(null);
 
   const isBusyRef = useRef(false);
@@ -93,19 +93,18 @@ const App: React.FC = () => {
     if (!user) return null;
     if (user.id === 'admin') return { ...user, role: UserRole.ADMIN };
 
-    const prof = data.professors.find(p => p.id === user.id);
+    const prof = data.professors.find(p => String(p.id) === String(user.id));
     if (prof) return { ...prof, role: UserRole.PROFESSOR };
 
-    const student = data.students.find(s => s.id === user.id);
+    const student = data.students.find(s => String(s.id) === String(user.id));
     if (student) return { ...student, role: UserRole.ALUNO };
 
     return user;
   }, [user, data]);
 
-  // ✅ CORRIGIDO: template string com crase
+  // bottts em todo o app (header inclusive)
   const getAvatarUrl = (u: User) =>
-    u.avatarUrl ||
-    (u.avatarSeed ? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}` : null);
+    u.avatarUrl || (u.avatarSeed ? `https://api.dicebear.com/9.x/bottts/svg?seed=${u.avatarSeed}` : null);
 
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
