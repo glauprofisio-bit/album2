@@ -112,6 +112,22 @@ if (profLogins.length > 0) {
       if (error) throw new Error(`students upsert: ${error.message}`);
     }
 
+    // ✅ DELETE REAL: remove do banco quem não está mais no payload
+const studentLogins = studentRows.map(s => s.login);
+
+if (studentLogins.length > 0) {
+  const { error: delStudErr } = await supabase
+    .from('students')
+    .delete()
+    .not('login', 'in', `(${studentLogins.map(l => `"${l}"`).join(',')})`);
+
+  if (delStudErr) throw new Error(`students delete missing: ${delStudErr.message}`);
+} else {
+  // se não veio nenhum aluno, limpa todos
+  const { error: delAllStudErr } = await supabase.from('students').delete().gt('id', '0');
+  if (delAllStudErr) throw new Error(`students delete all: ${delAllStudErr.message}`);
+}
+
     // 3) stickers
     const stickerUpserts = [];
     const stickerDeletes = [];
