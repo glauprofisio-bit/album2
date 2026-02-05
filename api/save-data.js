@@ -185,7 +185,13 @@ if (studentLogins.length > 0) {
         reconquistada: !!ss.reconquistada
       });
     }
+// ✅ ZERA e recria: assim, quando você "desmarca" presença, some do banco também
+const { error: wipeErr } = await supabase
+  .from('student_stickers')
+  .delete()
+  .gt('week', 0);
 
+if (wipeErr) throw new Error(`student_stickers wipe: ${wipeErr.message}`);
     for (const part of chunk(ssRows, 300)) {
       const { error } = await supabase
         .from('student_stickers')
