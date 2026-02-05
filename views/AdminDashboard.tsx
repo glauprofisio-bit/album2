@@ -413,7 +413,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
 
                     <button
                       disabled={isSyncing}
-                      onClick={() => handleDeleteProfessor(p)}
+                      onClick={() => handleDeleteProfessor(p.id)}
                       className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200 disabled:opacity-50"
                     >
                       <Trash2 size={20} strokeWidth={3} />
