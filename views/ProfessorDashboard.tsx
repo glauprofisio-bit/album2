@@ -290,21 +290,35 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                     </td>
                     {Array.from({ length: 45 }, (_, i) => i + 1).map(w => {
                       const sticker = data.studentStickers.find(s => s.alunoId === student.id && s.week === w);
-                      const isVerde = sticker?.liberada && !sticker?.isFalta;
-                      const isVermelho = sticker?.isFalta;
+                      const isAzul = sticker?.reconquistada;
+const isVerde = sticker?.liberada && !sticker?.isFalta && !sticker?.reconquistada;
+const isVermelho = sticker?.isFalta;
+
                       return (
                         <td key={w} className={`py-4 px-1 border-b-2 border-slate-50 text-center ${w === data.currentWeek ? 'bg-yellow-50/20' : ''}`}>
                           <button
                             onClick={() => toggleSticker(student.id, w)}
                             className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center transition-all active:scale-90 border-4 ${
-                              isVerde
-                                ? 'bg-green-500 border-indigo-950 text-white shadow-lg'
-                                : isVermelho
-                                ? 'bg-red-500 border-indigo-950 text-white shadow-lg'
-                                : 'bg-slate-50 border-slate-200 text-slate-200 hover:border-indigo-400 hover:text-indigo-400'
-                            }`}
+  isVerde
+    ? 'bg-green-500 border-indigo-950 text-white shadow-lg'
+    : isVermelho
+    ? 'bg-red-500 border-indigo-950 text-white shadow-lg'
+    : isAzul
+    ? 'bg-cyan-400 border-indigo-950 text-white shadow-lg'
+    : 'bg-slate-50 border-slate-200 text-slate-200 hover:border-indigo-400 hover:text-indigo-400'
+}`}
+
                           >
-                            {isVerde ? <CheckCircle size={20} strokeWidth={4} /> : isVermelho ? <XCircle size={20} strokeWidth={4} /> : <div className="w-2 h-2 rounded-full bg-current" />}
+                            {isVerde ? (
+  <CheckCircle size={20} strokeWidth={4} />
+) : isVermelho ? (
+  <XCircle size={20} strokeWidth={4} />
+) : isAzul ? (
+  <Star size={20} strokeWidth={4} />
+) : (
+  <div className="w-2 h-2 rounded-full bg-current" />
+)}
+
                           </button>
                         </td>
                       );
