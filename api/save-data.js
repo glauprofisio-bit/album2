@@ -11,8 +11,9 @@ export default async function handler(req, res) {
 
   try {
     // Chaves reais forçadas para evitar erro 500 na Vercel
-    const supabaseUrl = 'https://zcrjsvgjnbzawrnajgva.supabase.co';
-const supabaseKey = process.env.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjcmpzdmdqbmJ6YXdybmFqZ3ZhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTkxMDQzNiwiZXhwIjoyMDg1NDg2NDM2fQ.jeGMKAjhPed06OR6NlOj316Emho6YdkUSylZsS49-Fs;
+        // pega do ambiente (Vercel)
+    const url = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!url || !serviceKey) {
       return res.status(500).json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
