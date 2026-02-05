@@ -293,24 +293,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
     setIsSyncing(false);
   };
 
-  const handleDeleteProfessor = async (professorId: string) => {
-  if (!confirm('Deseja realmente excluir este professor?')) return;
+  const handleDeleteProfessor = async (p: User) => {
+    if (!confirm(`Deseja realmente excluir o professor ${p.name}?`)) return;
 
-  try {
-    await deleteProfessor(professorId);
-  } catch (e) {
-    console.error('Erro ao deletar professor no Supabase:', e);
-  }
-
-  const updatedProfessors = data.professors.filter(p => p.id !== professorId);
-
-  // opcional (recomendado): remove vínculo dos alunos desse professor
-  const updatedStudents = data.students.map(s =>
-    s.professorId === professorId ? { ...s, professorId: null } : s
-  );
-
-  await Promise.resolve(updateData({ professors: updatedProfessors, students: updatedStudents }));
-};
+    setIsSyncing(true);
+    const newProfs = data.professors.filter(x => x.id !== p.id);
+    await updateData({ professors: newProfs });
+    setIsSyncing(false);
+  };
 
   const handleUpdateSticker = useCallback(
     async (week: number, imageUrl: string, name: string, rarity: StickerRarity) => {
@@ -335,6 +325,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-center gap-2 text-white/80 font-black uppercase tracking-widest text-[10px]">
+        <Cloud size={14} />
+        {isSyncing ? 'Salvando na nuvem...' : 'Sincronizado'}
+      </div>
 
       <div className="flex bg-indigo-950 p-2 rounded-[2rem] gap-2 border-4 border-white/20 shadow-xl">
         <button
@@ -413,7 +407,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
 
                     <button
                       disabled={isSyncing}
-                      onClick={() => handleDeleteProfessor(p.id)}
+                      onClick={() => handleDeleteProfessor(p)}
                       className="bg-red-100 p-3 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200 disabled:opacity-50"
                     >
                       <Trash2 size={20} strokeWidth={3} />

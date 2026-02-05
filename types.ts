@@ -27,7 +27,6 @@ export interface User {
   avatarSeed?: string;
   serie?: string;
   ciclo?: Ciclo;
-  jotas?: number;
 }
 
 export interface Sticker {
