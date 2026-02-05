@@ -103,14 +103,18 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
   };
 
   const handleDeleteStudent = async (studentId: string) => {
-    if (!confirm('Deseja realmente excluir este aluno?')) return;
-    
-    // Filtra localmente primeiro para resposta rápida
-    const updatedStudents = data.students.filter(s => s.id !== studentId);
-    await updateData({ students: updatedStudents });
-    
-    // A função updateData agora já cuida do salvamento direto no Supabase
-  };
+  if (!confirm('Deseja realmente excluir este aluno?')) return;
+
+  const updatedStudents = data.students.filter(s => s.id !== studentId);
+
+  // ✅ remove também presença/figurinhas do aluno
+  const updatedStudentStickers = data.studentStickers.filter(ss => ss.alunoId !== studentId);
+
+  await updateData({
+    students: updatedStudents,
+    studentStickers: updatedStudentStickers
+  });
+};
 
   const toggleSticker = (alunoId: string, week: number) => {
     const existingIndex = data.studentStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
@@ -380,7 +384,11 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                   <button
                     onClick={() => {
                       if (confirm(`Tem certeza que deseja excluir ${s.name}?`)) {
-                        updateData({ students: data.students.filter(std => std.id !== s.id) });
+                        updateData({
+  students: data.students.filter(std => std.id !== s.id),
+  studentStickers: data.studentStickers.filter(ss => ss.alunoId !== s.id)
+});
+
                       }
                     }}
                     className="bg-red-100 p-4 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all border-2 border-red-200"
