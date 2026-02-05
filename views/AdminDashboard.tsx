@@ -293,14 +293,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ data, updateData }) => 
     setIsSyncing(false);
   };
 
-  const handleDeleteProfessor = async (p: User) => {
-    if (!confirm(`Deseja realmente excluir o professor ${p.name}?`)) return;
+  const handleDeleteProfessor = async (professorId: string) => {
+  if (!confirm('Deseja realmente excluir este professor?')) return;
 
-    setIsSyncing(true);
-    const newProfs = data.professors.filter(x => x.id !== p.id);
-    await updateData({ professors: newProfs });
-    setIsSyncing(false);
-  };
+  try {
+    await deleteProfessor(professorId);
+  } catch (e) {
+    console.error('Erro ao deletar professor no Supabase:', e);
+  }
+
+  const updatedProfessors = data.professors.filter(p => p.id !== professorId);
+
+  // opcional (recomendado): remove vínculo dos alunos desse professor
+  const updatedStudents = data.students.map(s =>
+    s.professorId === professorId ? { ...s, professorId: null } : s
+  );
+
+  await Promise.resolve(updateData({ professors: updatedProfessors, students: updatedStudents }));
+};
 
   const handleUpdateSticker = useCallback(
     async (week: number, imageUrl: string, name: string, rarity: StickerRarity) => {
