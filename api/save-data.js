@@ -86,13 +86,26 @@ export default async function handler(req, res) {
         if (!s?.login) continue;
 
         // tenta resolver professor_id real
-        let realProfId = s.professorId || null;
+        let realProfId = null;
 
-        // se veio um id "local", tenta achar o professor no array e mapear pelo login
-        const profLocal = professors.find(p => p.id === s.professorId);
-        if (profLocal?.login && profLoginToId.has(profLocal.login)) {
-          realProfId = profLoginToId.get(profLocal.login);
-        }
+// 1) se professorId já veio como UUID real do banco, só aceita se ele existir no banco
+if (s.professorId && typeof s.professorId === 'string') {
+  // existe no mapa por ID?
+  const exists = (allProfs || []).some(p => p.id === s.professorId);
+  if (exists) realProfId = s.professorId;
+}
+
+// 2) se veio um id "local", tenta mapear pelo login do professor do array
+if (!realProfId) {
+  const profLocal = professors.find(p => p.id === s.professorId);
+  if (profLocal?.login && profLoginToId.has(profLocal.login)) {
+    realProfId = profLoginToId.get(profLocal.login);
+  }
+}
+
+// 3) se não conseguiu resolver, zera (evita violar FK)
+if (!realProfId) realProfId = null;
+
 
         studentsToUpsert.push({
           name: s.name || '',
