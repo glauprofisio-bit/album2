@@ -69,6 +69,25 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
   }, [data.professors, user.professorId]);
 
   const getTutorAvatarUrl = (t: User) => {
+  // … corpo da função …
+};
+
+const TutorAvatarFrame: React.FC<{ url: string | null; alt: string }> = ({ url, alt }) => {
+  return (
+    <div className="w-10 h-10 rounded-full p-[3px] bg-[conic-gradient(from_180deg,#ff004c,#ffb800,#7CFF00,#00ffd5,#1f6bff,#8a2be2,#ff004c)] shadow-[0_0_0_4px_rgba(30,27,75,1)]">
+      <div className="w-full h-full rounded-full p-[3px] bg-yellow-400">
+        <div className="w-full h-full rounded-full overflow-hidden bg-white">
+          {url ? (
+            <img src={url} className="w-full h-full object-cover" alt={alt} />
+          ) : (
+            <UserCircle className="w-full h-full text-slate-300" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+  
     if (t.avatarUrl) return t.avatarUrl;
     if (t.avatarSeed) return `https://api.dicebear.com/9.x/bottts/svg?seed=${t.avatarSeed}`;
     return null;
@@ -513,13 +532,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
 
           {tutor && (
             <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-[2rem] border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] w-fit">
-              <div className="w-12 h-12 rounded-full border-4 border-indigo-950 overflow-hidden bg-white shadow-md">
-                {getTutorAvatarUrl(tutor) ? (
-                  <img src={getTutorAvatarUrl(tutor)!} className="w-full h-full object-cover" alt="tutor" />
-                ) : (
-                  <UserCircle className="w-full h-full text-slate-300" />
-                )}
-              </div>
+              <TutorAvatarFrame url={getTutorAvatarUrl(tutor)} alt="tutor" />
               <div className="flex flex-col">
                 <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400 leading-none mb-1">Tutor</span>
                 <span className="text-lg font-black text-indigo-950 uppercase italic leading-none">{tutor.name}</span>
