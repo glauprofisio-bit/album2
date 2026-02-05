@@ -304,7 +304,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
             <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
               <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Série</label>
               <input
-                placeholder="Ex: 6º Ano"
+                placeholder="Ex: 6A"
                 value={filterSerie}
                 onChange={(e) => setFilterSerie(e.target.value)}
                 className="w-full p-3 rounded-xl border-2 border-indigo-950 outline-none font-black text-indigo-950 bg-white"
@@ -410,7 +410,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
                   <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 px-4">Série / Turma</label>
                   <input
                     required
-                    placeholder="Ex: 6º Ano A"
+                    placeholder="Ex: 6A"
                     value={bulkSerie}
                     onChange={e => setBulkSerie(e.target.value)}
                     className="w-full p-5 bg-slate-50 rounded-3xl border-4 border-indigo-950 outline-none font-black text-indigo-950 focus:bg-white transition-all"
