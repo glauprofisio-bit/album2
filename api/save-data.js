@@ -96,15 +96,16 @@ if (profLogins.length > 0) {
         }
 
         return {
-          name: s.name || '',
-          login: s.login,
-          password: s.password || '',
-          professor_id: professorId || null,
-          avatar_url: s.avatarUrl || '',
-          avatar_seed: s.avatarSeed || '',
-          serie: s.serie || '',
-          ciclo: s.ciclo || null
-        };
+  name: s.name || '',
+  login: s.login,
+  password: s.password || '',
+  professor_id: professorId || null,
+  avatar_url: s.avatarUrl || '',
+  avatar_seed: s.avatarSeed || '',
+  serie: s.serie || '',
+  ciclo: s.ciclo || null,
+  jotas: Number.isFinite(Number(s.jotas)) ? Number(s.jotas) : 0,
+};
       });
 
     for (const part of chunk(studentRows, 300)) {
