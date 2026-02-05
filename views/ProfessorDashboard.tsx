@@ -176,7 +176,6 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
   updateData({ studentStickers: newStickers });
 };
-  };
 
   const classificationData = useMemo(() => {
     return myStudents
