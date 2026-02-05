@@ -408,49 +408,8 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
           <div className="bg-white rounded-[3rem] p-8 border-[8px] border-indigo-950 shadow-[0_12px_0_0_rgba(30,27,75,1)] animate-in slide-in-from-bottom-4 duration-300">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
               <h2 className="text-3xl font-black italic uppercase tracking-tighter text-indigo-950">
-                <div className="mt-6 mb-8 bg-slate-50 rounded-[3rem] border-[6px] border-indigo-950 p-6 shadow-[0_8px_0_0_rgba(30,27,75,1)]">
-  <h3 className="text-xl font-black uppercase italic tracking-tighter text-indigo-950 mb-4">
-    Lista de alunos
-  </h3>
-
-  <div className="space-y-3">
-    {myStudents.map(s => (
-      <div
-        key={s.id}
-        className="flex items-center justify-between gap-4 bg-white rounded-[2rem] p-4 border-4 border-indigo-950"
-      >
-        <div className="min-w-0">
-          <div className="font-black text-indigo-950 uppercase italic truncate">
-            {s.name}
-          </div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mt-1">
-            {s.serie || '—'} | {s.ciclo || '—'}
-          </div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mt-2 break-all">
-            Login: {s.login} {s.password ? `| Senha: ${s.password}` : '| Senha: —'}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => handleDeleteStudent(s.id)}
-          className="flex-shrink-0 px-4 py-3 rounded-2xl border-4 border-indigo-950 bg-red-500 text-white font-black uppercase italic tracking-tighter shadow-[0_4px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all"
-        >
-          Excluir
-        </button>
-      </div>
-    ))}
-
-    {myStudents.length === 0 && (
-      <div className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
-        Nenhum aluno cadastrado para este professor.
-      </div>
-    )}
-  </div>
-</div>
-
-                Classificação
-              </h2>
+  Classificação
+</h2>
 
               <div className="flex flex-wrap items-center gap-3">
                 <select
@@ -490,6 +449,51 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
                 </button>
               </div>
             </div>
+
+<div className="mt-6 mb-8 bg-slate-50 rounded-[3rem] border-[6px] border-indigo-950 p-6 shadow-[0_8px_0_0_rgba(30,27,75,1)]">
+  <h3 className="text-xl font-black uppercase italic tracking-tighter text-indigo-950 mb-4">
+    Lista de alunos
+  </h3>
+
+  <div className="space-y-3">
+    {myStudents.map(s => (
+      <div
+        key={s.id}
+        className="flex flex-col gap-3 bg-white rounded-[2rem] p-4 border-4 border-indigo-950"
+      >
+        <div className="min-w-0">
+          <div className="font-black text-indigo-950 uppercase italic break-words">
+            {s.name}
+          </div>
+
+          <div className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mt-1 break-words">
+            {s.serie || '—'} | {s.ciclo || '—'}
+          </div>
+
+          <div className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mt-2 break-words">
+            Login: <span className="text-indigo-950">{s.login}</span>
+            <br />
+            Senha: <span className="text-indigo-950">{s.password || '—'}</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => handleDeleteStudent(s.id)}
+          className="self-start px-4 py-3 rounded-2xl border-4 border-indigo-950 bg-red-500 text-white font-black uppercase italic tracking-tighter shadow-[0_4px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all"
+        >
+          Excluir
+        </button>
+      </div>
+    ))}
+
+    {myStudents.length === 0 && (
+      <div className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
+        Nenhum aluno cadastrado para este professor.
+      </div>
+    )}
+  </div>
+</div>
 
             <div className="overflow-x-auto pb-4 custom-scrollbar">
               <table className="w-full border-collapse">
