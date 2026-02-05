@@ -44,7 +44,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
   const getAvatarUrl = (u: User) => {
     if (u.avatarUrl) return u.avatarUrl;
-    if (u.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}`;
+    if (u.avatarSeed) return `https://api.dicebear.com/9.x/bottts/svg?seed=${u.avatarSeed}`;
     return null;
   };
 
