@@ -40,7 +40,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
 
   const avatarDisplayUrl = useMemo(() => {
     if (user.avatarUrl) return user.avatarUrl;
-    if (user.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${user.avatarSeed}`;
+    if (user.avatarSeed) return `https://api.dicebear.com/9.x/bottts/svg?seed=${user.avatarSeed}`;
     return null;
   }, [user.avatarUrl, user.avatarSeed]);
 
@@ -70,7 +70,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
 
   const getTutorAvatarUrl = (t: User) => {
     if (t.avatarUrl) return t.avatarUrl;
-    if (t.avatarSeed) return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${t.avatarSeed}`;
+    if (t.avatarSeed) return `https://api.dicebear.com/9.x/bottts/svg?seed=${t.avatarSeed}`;
     return null;
   };
 
