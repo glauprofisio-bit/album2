@@ -69,7 +69,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, data, updateD
   }, [data.professors, user.professorId]);
 
   const getTutorAvatarUrl = (t: User) => {
-  // … corpo da função …
+  if (t.avatarUrl) return t.avatarUrl;
+  if (t.avatarSeed) return `https://api.dicebear.com/9.x/bottts/svg?seed=${t.avatarSeed}`;
+  return null;
 };
 
 const TutorAvatarFrame: React.FC<{ url: string | null; alt: string }> = ({ url, alt }) => {
@@ -87,11 +89,7 @@ const TutorAvatarFrame: React.FC<{ url: string | null; alt: string }> = ({ url, 
     </div>
   );
 };
-  
-    if (t.avatarUrl) return t.avatarUrl;
-    if (t.avatarSeed) return `https://api.dicebear.com/9.x/bottts/svg?seed=${t.avatarSeed}`;
-    return null;
-  };
+
 
   const getRarityStyle = (r: StickerRarity = StickerRarity.NORMAL) => {
     switch (r) {
