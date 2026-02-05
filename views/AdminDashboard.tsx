@@ -72,18 +72,53 @@ const StickerEditor: React.FC<StickerEditorProps> = ({ week, sticker, onSave }) 
 
   const currentInfo = getRarityInfo(rarity);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    setIsCompressing(true);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setUrl(reader.result as string);
+  setIsCompressing(true);
+
+  try {
+    const img = new Image();
+
+    img.onload = () => {
+      const maxH = 900;
+      const scale = Math.min(1, maxH / img.height);
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setIsCompressing(false);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const jpegBase64 = canvas.toDataURL('image/jpeg', 0.72);
+      setUrl(jpegBase64);
       setIsCompressing(false);
     };
+
+    img.onerror = () => {
+      setIsCompressing(false);
+      alert('Não consegui ler essa imagem. Tente outra.');
+    };
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      img.src = reader.result as string;
+    };
     reader.readAsDataURL(file);
-  };
+  } catch (err) {
+    setIsCompressing(false);
+    alert('Erro ao processar imagem.');
+  }
+};
 
   return (
     <>
