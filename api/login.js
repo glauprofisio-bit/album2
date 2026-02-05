@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Chaves reais forçadas para evitar erro 500 na Vercel e garantir conexão com banco afn
-const supabaseUrl = 'https://zcrjsvgjnbzawrnajgva.supabase.co';
-const supabaseKey = process.env.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjcmpzdmdqbmJ6YXdybmFqZ3ZhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTkxMDQzNiwiZXhwIjoyMDg1NDg2NDM2fQ.jeGMKAjhPed06OR6NlOj316Emho6YdkUSylZsS49-Fs;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
