@@ -102,7 +102,7 @@ const App: React.FC = () => {
   }, [user, data.professors, data.students]);
 
   const getAvatarUrl = (u: User) =>
-    u.avatarUrl || (u.avatarSeed ? `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${u.avatarSeed}` : null);
+    u.avatarUrl || (u.avatarSeed ? `https://api.dicebear.com/9.x/bottts/svg?seed=${u.avatarSeed}` : null);
 
   const updateCurrentProfile = async (updates: Partial<User>) => {
     if (!currentUser) return;
