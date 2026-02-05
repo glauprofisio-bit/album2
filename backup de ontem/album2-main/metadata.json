@@ -1,7 +1,0 @@
-{
-  "name": "Álbum Digital de Figurinhas Escolares",
-  "description": "Sistema de fidelidade escolar para a PEI E.E. Dr. Disnei Francisco Scornaienchi, incentivando a frequência dos alunos através de figurinhas digitais.",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}

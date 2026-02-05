@@ -1,6 +1,0 @@
-# Não redirecionar arquivos estáticos
-/data.json 200
-/api/* 200
-
-# Redirecionar todas as outras rotas para index.html (SPA)
-/* /index.html 200
