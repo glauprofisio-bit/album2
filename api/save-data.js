@@ -135,61 +135,67 @@ export default async function handler(req, res) {
       }
     }
 
-    // 5. FIGURINHAS DOS ALUNOS
+        // 5. FIGURINHAS DOS ALUNOS (presença/falta/liberação/revelação)
     if (studentStickers.length > 0) {
-      // Precisamos dos IDs reais dos alunos e das figurinhas
-      const { data: allStudents } = await supabase.from('students').select('id, login');
-      const { data: allStickers } = await supabase.from('stickers').select('id, week');
-      
-      const studentMap = new Map();
-      (allStudents || []).forEach(s => studentMap.set(s.login, s.id));
-      
-      const stickerMap = new Map();
-      (allStickers || []).forEach(s => stickerMap.set(s.week, s.id));
+      const { data: allStudents, error: eAllStudents } = await supabase
+        .from('students')
+        .select('id, login');
+
+      if (eAllStudents) throw new Error(`students(select): ${eAllStudents.message}`);
+
+      const studentLoginToId = new Map();
+      (allStudents || []).forEach(s => studentLoginToId.set(s.login, s.id));
+
+      const looksLikeUuid = (v) =>
+        typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+      const resolveStudentId = (alunoId) => {
+        if (!alunoId) return null;
+
+        // 1) se já veio UUID do banco
+        if (looksLikeUuid(alunoId)) return alunoId;
+
+        // 2) se veio o login do aluno
+        if (studentLoginToId.has(alunoId)) return studentLoginToId.get(alunoId);
+
+        // 3) se veio um id local (tipo "stud-1"), tenta achar no array students e usar o login
+        const local = (students || []).find(s => s.id === alunoId);
+        if (local?.login && studentLoginToId.has(local.login)) return studentLoginToId.get(local.login);
+
+        return null;
+      };
 
       const ssToUpsert = [];
       for (const ss of studentStickers) {
         if (!ss?.week) continue;
 
-        // Tenta achar o ID do aluno pelo login ou ID enviado
-        let realStudentId = ss.alunoId;
-        
-        // Mapeamento direto e simples: prioriza o ID que já é UUID, senão busca pelo login
-        if (ss.alunoId && ss.alunoId.length > 30) { 
-           realStudentId = ss.alunoId; // Provavelmente já é o UUID do banco afn
-        } else {
-           const studentObj = students.find(s => s.login === ss.alunoId || s.id === ss.alunoId);
-           if (studentObj) realStudentId = studentObj.id;
-        }
+        const realStudentId = resolveStudentId(ss.alunoId);
+        if (!realStudentId) continue;
 
-        if (realStudentId) {
-          // Simplificação máxima para garantir o salvamento no banco afn
-          ssToUpsert.push({
-            student_id: realStudentId,
-            week: ss.week,
-            liberada: ss.liberada === true,
-            is_falta: ss.isFalta === true,
-            revelada: ss.revelada === true
-          });
-        }
-           if (ssToUpsert.length > 0) {
-        const CHUNK_SIZE = 50;
+        ssToUpsert.push({
+          student_id: realStudentId,
+          week: ss.week,
+          liberada: ss.liberada === true,
+          revelada: ss.revelada === true,
+          is_falta: ss.isFalta === true,
+          reconquistada: ss.reconquistada === true
+        });
+      }
+
+      if (ssToUpsert.length > 0) {
+        const CHUNK_SIZE = 100;
         for (let i = 0; i < ssToUpsert.length; i += CHUNK_SIZE) {
           const chunk = ssToUpsert.slice(i, i + CHUNK_SIZE);
-          console.log(`Upserting chunk of ${chunk.length} stickers...`);
+
           const { error: ssError } = await supabase
             .from('student_stickers')
-            .upsert(chunk, { onConflict: 'student_id, week' });
-          
-          if (ssError) {
-            console.error('Erro no upsert de student_stickers:', ssError);
-            throw new Error(`Erro ao salvar figurinhas: ${ssError.message}`);
-          }
+            .upsert(chunk, { onConflict: 'student_id,week' });
+
+          if (ssError) throw new Error(`student_stickers: ${ssError.message}`);
         }
       }
     }
 
-    return res.status(200).json({ success: true });
   } catch (err) {
     console.error('Save error:', err);
     return res.status(500).json({ error: String(err?.message || err) });
