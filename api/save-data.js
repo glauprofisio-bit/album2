@@ -10,8 +10,6 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    // Chaves reais forçadas para evitar erro 500 na Vercel
-        // pega do ambiente (Vercel)
     const url = process.env.SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -21,23 +19,23 @@ export default async function handler(req, res) {
 
     const supabase = createClient(url, serviceKey);
 
-    const {
-      professors = [],
-      students = [],
-      stickers = [],
-      studentStickers = [],
-      currentWeek
-    } = req.body || {};
+    const body = req.body || {};
+    const professors = Array.isArray(body.professors) ? body.professors : [];
+    const students = Array.isArray(body.students) ? body.students : [];
+    const stickers = Array.isArray(body.stickers) ? body.stickers : [];
+    const studentStickers = Array.isArray(body.studentStickers) ? body.studentStickers : [];
+    const currentWeek = body.currentWeek;
 
-    // 1. Configurações Globais
+    // 1) Config global
     if (currentWeek !== undefined && currentWeek !== null) {
-      await supabase
+      const { error } = await supabase
         .from('app_settings')
         .upsert({ id: 'global', current_week: currentWeek }, { onConflict: 'id' });
+      if (error) throw new Error(`app_settings: ${error.message}`);
     }
 
-    // 2. PROFESSORES
-    if (professors.length > 0) {
+    // 2) PROFESSORES (SALVA + EXCLUI MESMO SE VIER VAZIO)
+    {
       const profsToUpsert = professors
         .filter(p => p?.login && p.id !== 'admin' && p.login !== 'admin')
         .map(p => ({
@@ -46,43 +44,54 @@ export default async function handler(req, res) {
           password: p.password || '',
           avatar_url: p.avatarUrl || '',
           avatar_seed: p.avatarSeed || '',
-          // REMOVIDO: email (para evitar erro de UNIQUE e campo inexistente)
           role: 'professor'
         }));
 
       if (profsToUpsert.length > 0) {
         const { error } = await supabase.from('professors').upsert(profsToUpsert, { onConflict: 'login' });
-        if (error) throw new Error(`Professors: ${error.message}`);
+        if (error) throw new Error(`professors(upsert): ${error.message}`);
       }
 
-      // Sincronização de Professores
+      // sempre sincroniza exclusão
       const incomingProfLogins = new Set(profsToUpsert.map(p => p.login));
-      const { data: existingProfs } = await supabase.from('professors').select('id,login');
-      const toDelete = (existingProfs || []).filter(r => r.login !== 'admin' && !incomingProfLogins.has(r.login));
+
+      const { data: existingProfs, error: eExisting } = await supabase
+        .from('professors')
+        .select('id,login');
+
+      if (eExisting) throw new Error(`professors(select): ${eExisting.message}`);
+
+      const toDelete = (existingProfs || []).filter(
+        r => r.login !== 'admin' && !incomingProfLogins.has(r.login)
+      );
 
       if (toDelete.length > 0) {
         const idsToDelete = toDelete.map(x => x.id);
         await supabase.from('students').update({ professor_id: null }).in('professor_id', idsToDelete);
-        await supabase.from('professors').delete().in('id', idsToDelete);
+        const { error: eDel } = await supabase.from('professors').delete().in('id', idsToDelete);
+        if (eDel) throw new Error(`professors(delete): ${eDel.message}`);
       }
     }
 
-    // 3. ALUNOS
-    if (students.length > 0) {
-      // Precisamos pegar os IDs reais dos professores para vincular os alunos corretamente
-      const { data: allProfs } = await supabase.from('professors').select('id, login');
-      const profMap = new Map();
-      (allProfs || []).forEach(p => profMap.set(p.login, p.id));
+    // 3) ALUNOS (SALVA + EXCLUI MESMO SE VIER VAZIO)
+    {
+      const { data: allProfs, error: eAllProfs } = await supabase.from('professors').select('id, login');
+      if (eAllProfs) throw new Error(`professors(select ids): ${eAllProfs.message}`);
+
+      const profLoginToId = new Map();
+      (allProfs || []).forEach(p => profLoginToId.set(p.login, p.id));
 
       const studentsToUpsert = [];
       for (const s of students) {
         if (!s?.login) continue;
-        
-        // Resolve o ID do professor pelo login, caso o ID enviado seja temporário
-        let realProfId = s.professorId;
-        const profByLogin = professors.find(p => p.id === s.professorId);
-        if (profByLogin && profMap.has(profByLogin.login)) {
-          realProfId = profMap.get(profByLogin.login);
+
+        // tenta resolver professor_id real
+        let realProfId = s.professorId || null;
+
+        // se veio um id "local", tenta achar o professor no array e mapear pelo login
+        const profLocal = professors.find(p => p.id === s.professorId);
+        if (profLocal?.login && profLoginToId.has(profLocal.login)) {
+          realProfId = profLoginToId.get(profLocal.login);
         }
 
         studentsToUpsert.push({
@@ -94,28 +103,34 @@ export default async function handler(req, res) {
           avatar_seed: s.avatarSeed || '',
           serie: s.serie || '',
           ciclo: s.ciclo || null
-          // REMOVIDO: email
         });
       }
 
       if (studentsToUpsert.length > 0) {
         const { error } = await supabase.from('students').upsert(studentsToUpsert, { onConflict: 'login' });
-        if (error) throw new Error(`Students: ${error.message}`);
+        if (error) throw new Error(`students(upsert): ${error.message}`);
       }
 
-      // Sincronização de Alunos
+      // sempre sincroniza exclusão
       const incomingStudentLogins = new Set(studentsToUpsert.map(s => s.login));
-      const { data: existingStudents } = await supabase.from('students').select('id,login');
+
+      const { data: existingStudents, error: eExisting } = await supabase
+        .from('students')
+        .select('id,login');
+
+      if (eExisting) throw new Error(`students(select): ${eExisting.message}`);
+
       const toDelete = (existingStudents || []).filter(r => !incomingStudentLogins.has(r.login));
 
       if (toDelete.length > 0) {
         const idsToDelete = toDelete.map(x => x.id);
         await supabase.from('student_stickers').delete().in('student_id', idsToDelete);
-        await supabase.from('students').delete().in('id', idsToDelete);
+        const { error: eDel } = await supabase.from('students').delete().in('id', idsToDelete);
+        if (eDel) throw new Error(`students(delete): ${eDel.message}`);
       }
     }
 
-    // 4. FIGURINHAS
+    // 4) FIGURINHAS (salva as com imagem; apaga as que ficaram sem imagem)
     if (stickers.length > 0) {
       const stickersToUpsert = stickers
         .filter(st => st?.week && String(st.imageUrl || '').trim())
@@ -127,39 +142,40 @@ export default async function handler(req, res) {
         }));
 
       if (stickersToUpsert.length > 0) {
-        await supabase.from('stickers').upsert(stickersToUpsert, { onConflict: 'week' });
+        const { error } = await supabase.from('stickers').upsert(stickersToUpsert, { onConflict: 'week' });
+        if (error) throw new Error(`stickers(upsert): ${error.message}`);
       }
 
-      const weeksToEmpty = stickers.filter(st => st?.week && !String(st.imageUrl || '').trim()).map(st => st.week);
+      const weeksToEmpty = stickers
+        .filter(st => st?.week && !String(st.imageUrl || '').trim())
+        .map(st => st.week);
+
       if (weeksToEmpty.length > 0) {
-        await supabase.from('stickers').delete().in('week', weeksToEmpty);
+        const { error } = await supabase.from('stickers').delete().in('week', weeksToEmpty);
+        if (error) throw new Error(`stickers(delete): ${error.message}`);
       }
     }
 
-        // 5. FIGURINHAS DOS ALUNOS (presença/falta/liberação/revelação)
+    // 5) PRESENÇA/FALTA (student_stickers)
     if (studentStickers.length > 0) {
       const { data: allStudents, error: eAllStudents } = await supabase
         .from('students')
         .select('id, login');
 
-      if (eAllStudents) throw new Error(`students(select): ${eAllStudents.message}`);
+      if (eAllStudents) throw new Error(`students(select ids): ${eAllStudents.message}`);
 
       const studentLoginToId = new Map();
       (allStudents || []).forEach(s => studentLoginToId.set(s.login, s.id));
 
       const looksLikeUuid = (v) =>
-        typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+        typeof v === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
       const resolveStudentId = (alunoId) => {
         if (!alunoId) return null;
-
-        // 1) se já veio UUID do banco
         if (looksLikeUuid(alunoId)) return alunoId;
-
-        // 2) se veio o login do aluno
         if (studentLoginToId.has(alunoId)) return studentLoginToId.get(alunoId);
 
-        // 3) se veio um id local (tipo "stud-1"), tenta achar no array students e usar o login
         const local = (students || []).find(s => s.id === alunoId);
         if (local?.login && studentLoginToId.has(local.login)) return studentLoginToId.get(local.login);
 
@@ -188,15 +204,17 @@ export default async function handler(req, res) {
         for (let i = 0; i < ssToUpsert.length; i += CHUNK_SIZE) {
           const chunk = ssToUpsert.slice(i, i + CHUNK_SIZE);
 
-          const { error: ssError } = await supabase
+          const { error } = await supabase
             .from('student_stickers')
             .upsert(chunk, { onConflict: 'student_id,week' });
 
-          if (ssError) throw new Error(`student_stickers: ${ssError.message}`);
+          if (error) throw new Error(`student_stickers(upsert): ${error.message}`);
         }
       }
     }
 
+    // ✅ resposta final (isso faltava no seu arquivo)
+    return res.status(200).json({ success: true });
   } catch (err) {
     console.error('Save error:', err);
     return res.status(500).json({ error: String(err?.message || err) });
