@@ -30,7 +30,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({ onSelect, onClose
                   onClick={() => onSelect({ avatarSeed: seed, avatarUrl: undefined })}
                   className="aspect-square bg-slate-50 rounded-[2rem] border-4 border-slate-100 p-2 hover:border-indigo-600 hover:bg-indigo-50 transition-all group overflow-hidden shadow-sm"
                 >
-                  <img src={`https://api.dicebear.com/9.x/fun-emoji/svg?seed=${seed}`} className="w-full h-full object-contain group-hover:scale-110 transition-transform" />
+                  <img src={`https://api.dicebear.com/9.x/bottts/svg?seed=${seed}`} className="w-full h-full object-contain group-hover:scale-110 transition-transform" />
                 </button>
               ))}
               <button 
