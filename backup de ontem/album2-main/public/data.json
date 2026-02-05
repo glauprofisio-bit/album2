@@ -1,0 +1,18 @@
+{
+  "professors": [
+    {
+      "id": "prof-1",
+      "name": "Tati",
+      "email": "tati@escola.com",
+      "login": "Tati",
+      "password": "385126",
+      "role": "professor",
+      "avatarUrl": "",
+      "avatarSeed": ""
+    }
+  ],
+  "students": [],
+  "stickers": [],
+  "studentStickers": [],
+  "currentWeek": 1
+}
