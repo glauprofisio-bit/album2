@@ -47,6 +47,21 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     if (u.avatarSeed) return `https://api.dicebear.com/9.x/bottts/svg?seed=${u.avatarSeed}`;
     return null;
   };
+  const ProfessorAvatarFrame: React.FC<{ url: string | null; alt: string }> = ({ url, alt }) => {
+  return (
+    <div className="w-16 h-16 rounded-full p-[4px] bg-[conic-gradient(from_180deg,#ff004c,#ffb800,#7CFF00,#00ffd5,#1f6bff,#8a2be2,#ff004c)] shadow-[0_0_0_4px_rgba(30,27,75,1)]">
+      <div className="w-full h-full rounded-full p-[4px] bg-yellow-400">
+        <div className="w-full h-full rounded-full overflow-hidden bg-white">
+          {url ? (
+            <img src={url} className="w-full h-full object-cover" alt={alt} />
+          ) : (
+            <UserCircle className="w-full h-full text-slate-300" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
   const handleAddBulkStudents = (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,6 +187,30 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-500">
+     {/* Perfil do Tutor (Professor) */}
+<div className="bg-white/20 rounded-[3rem] p-5 border-4 border-indigo-950 shadow-lg flex items-center justify-between gap-4">
+  <div className="flex items-center gap-4 min-w-0">
+    <button onClick={() => setIsAvatarPickerOpen(true)} className="relative group" title="Trocar avatar">
+      <ProfessorAvatarFrame url={getAvatarUrl(user)} alt="avatar tutor" />
+      <div className="absolute -bottom-2 -right-2 bg-yellow-400 p-2 rounded-2xl border-4 border-indigo-950 shadow-lg rotate-[-10deg] group-hover:rotate-0 transition-all">
+        <Star size={16} className="text-indigo-950" fill="currentColor" />
+      </div>
+    </button>
+
+    <div className="min-w-0">
+      <p className="text-white font-black uppercase italic tracking-tighter text-2xl truncate">{user.name}</p>
+      <p className="text-yellow-300 font-black uppercase tracking-widest text-[10px]">Tutor</p>
+    </div>
+  </div>
+
+  <button
+    onClick={() => setIsAvatarPickerOpen(true)}
+    className="bg-yellow-400 hover:bg-yellow-500 text-indigo-950 px-6 py-4 rounded-[2rem] font-black uppercase italic tracking-tighter border-4 border-indigo-950 shadow-[0_6px_0_0_rgba(30,27,75,1)] active:translate-y-1 active:shadow-none transition-all"
+  >
+    Trocar avatar
+  </button>
+</div>
+
       {/* Header com Tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex bg-white/20 p-2 rounded-[2rem] border-4 border-indigo-950 shadow-lg">
