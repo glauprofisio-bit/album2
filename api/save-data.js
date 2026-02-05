@@ -56,6 +56,27 @@ export default async function handler(req, res) {
       if (error) throw new Error(`professors upsert: ${error.message}`);
     }
 
+    // ✅ DELETE REAL: remove do banco quem não está mais no payload
+const profLogins = profRows.map(p => p.login);
+
+if (profLogins.length > 0) {
+  const { error: delProfErr } = await supabase
+    .from('professors')
+    .delete()
+    .neq('login', 'admin')
+    .not('login', 'in', `(${profLogins.map(l => `"${l}"`).join(',')})`);
+
+  if (delProfErr) throw new Error(`professors delete missing: ${delProfErr.message}`);
+} else {
+  // se não veio nenhum professor (exceto admin), limpa tudo menos admin
+  const { error: delAllProfErr } = await supabase
+    .from('professors')
+    .delete()
+    .neq('login', 'admin');
+
+  if (delAllProfErr) throw new Error(`professors delete all: ${delAllProfErr.message}`);
+}
+
     // 2) students
     // precisa mapear professorId que veio do front (que pode ser id fake) para id real no banco
     const { data: profDb, error: profErr } = await supabase.from('professors').select('id,login');
