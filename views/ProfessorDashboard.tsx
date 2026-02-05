@@ -132,35 +132,50 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
 };
 
   const toggleSticker = (alunoId: string, week: number) => {
-    const existingIndex = data.studentStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
-    let newStickers = [...data.studentStickers];
+  const existingIndex = data.studentStickers.findIndex(s => s.alunoId === alunoId && s.week === week);
+  let newStickers = [...data.studentStickers];
 
-    if (existingIndex === -1) {
-      // Estado: Nada -> Verde (Presença)
-      newStickers.push({
-        alunoId,
-        week,
+  if (existingIndex === -1) {
+    // Nada -> Verde (Presença)
+    newStickers.push({
+      alunoId,
+      week,
+      liberada: true,
+      revelada: false,
+      reconquistada: false,
+      isFalta: false,
+      date: new Date().toISOString()
+    });
+  } else {
+    const sticker = newStickers[existingIndex];
+
+    const isGreen = sticker.liberada && !sticker.isFalta && !sticker.reconquistada;
+    const isRed = sticker.isFalta === true;
+    const isBlue = sticker.reconquistada === true;
+
+    if (isGreen) {
+      // Verde -> Vermelho (Falta)
+      newStickers[existingIndex] = { ...sticker, liberada: false, isFalta: true, reconquistada: false };
+    } else if (isRed) {
+      // Vermelho -> Azul (Reconquista)
+      newStickers[existingIndex] = {
+        ...sticker,
         liberada: true,
-        revelada: false,
-        reconquistada: false,
         isFalta: false,
-        date: new Date().toISOString()
-      });
+        reconquistada: true,
+        revelada: false
+      };
+    } else if (isBlue) {
+      // Azul -> Nada
+      newStickers.splice(existingIndex, 1);
     } else {
-      const sticker = newStickers[existingIndex];
-      if (sticker.liberada && !sticker.isFalta) {
-        // Estado: Verde -> Vermelho (Falta)
-        newStickers[existingIndex] = { ...sticker, liberada: false, isFalta: true };
-      } else if (sticker.isFalta) {
-        // Estado: Vermelho -> Nada
-        newStickers.splice(existingIndex, 1);
-      } else {
-        // Fallback
-        newStickers.splice(existingIndex, 1);
-      }
+      // fallback -> Nada
+      newStickers.splice(existingIndex, 1);
     }
+  }
 
-    updateData({ studentStickers: newStickers });
+  updateData({ studentStickers: newStickers });
+};
   };
 
   const classificationData = useMemo(() => {
