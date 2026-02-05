@@ -55,7 +55,14 @@ export async function saveData(
   }
 }
 
-// Nova função para deletar aluno diretamente no Supabase
+// Deleta aluno na tabela students
 export async function deleteStudent(studentId: string): Promise<void> {
-  await supabase.from('students').delete().eq('id', studentId);
+  const { error } = await supabase.from('students').delete().eq('id', studentId);
+  if (error) throw error;
+}
+
+// Deleta professor na tabela professors
+export async function deleteProfessor(professorId: string): Promise<void> {
+  const { error } = await supabase.from('professors').delete().eq('id', professorId);
+  if (error) throw error;
 }
