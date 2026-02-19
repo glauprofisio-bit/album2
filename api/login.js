@@ -8,13 +8,19 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store');
   
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { login, password, role } = req.body;
+    const rawLogin = req.body?.login;
+const rawPassword = req.body?.password;
+const role = req.body?.role;
+
+const login = String(rawLogin ?? '').trim();
+const password = String(rawPassword ?? '').trim();
 
     if (!login || !password || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
