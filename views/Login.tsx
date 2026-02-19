@@ -21,8 +21,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        login,
-        password,
+        login: login.trim(),
+        password: password.trim(),
         role:
           selectedRole === UserRole.ADMIN
             ? 'admin'
