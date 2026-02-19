@@ -69,16 +69,16 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({ user, data, upd
     const newStudents: User[] = bulkStudents
       .filter(s => s.name && s.login)
       .map(s => ({
-        id: Math.random().toString(36).substr(2, 9),
-        name: s.name,
-        email: '',
-        login: s.login,
-        password: s.password,
-        serie: bulkSerie,
-        ciclo: bulkCiclo,
-        role: UserRole.ALUNO,
-        professorId: user.id
-      }));
+  id: Math.random().toString(36).substr(2, 9),
+  name: (s.name || '').trim(),
+  email: '',
+  login: (s.login || '').trim(),
+  password: (s.password || '').trim(),
+  serie: (bulkSerie || '').trim(),
+  ciclo: bulkCiclo,
+  role: UserRole.ALUNO,
+  professorId: user.id
+}));
 
     if (newStudents.length === 0) return;
 
