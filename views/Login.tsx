@@ -13,40 +13,39 @@ const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError('');
 
-    if (selectedRole === UserRole.ADMIN) {
-      // No frontend, o ideal é validar via API, mas mantendo a lógica atual com proteção
-      const adminLogin = import.meta.env.VITE_ADMIN_LOGIN || 'Glau';
-      const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || 'Smart200#';
-      
-      if (login === adminLogin && password === adminPass) {
-        onLogin({ id: 'admin', name: 'Administrador Glau', email: 'admin@escola.com', login: 'Glau', role: UserRole.ADMIN });
-        return;
-      }
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        login,
+        password,
+        role:
+          selectedRole === UserRole.ADMIN
+            ? 'admin'
+            : selectedRole === UserRole.PROFESSOR
+            ? 'professor'
+            : 'student'
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      setError('Login ou senha incorretos!');
+      return;
     }
 
-    if (selectedRole === UserRole.PROFESSOR) {
-      const prof = appData.professors.find(p => p.login === login && p.password === password);
-      if (prof) {
-        onLogin(prof);
-        return;
-      }
-    }
-
-    if (selectedRole === UserRole.ALUNO) {
-      const student = appData.students.find(s => s.login === login && s.password === password);
-      if (student) {
-        onLogin(student);
-        return;
-      }
-    }
-
-    setError('Login ou senha incorretos!');
-  };
-
+    onLogin(result.user);
+  } catch (err) {
+    setError('Erro ao conectar com o servidor.');
+  }
+};
+	
   return (
     <div className="flex flex-col items-center justify-center min-h-screen relative overflow-hidden px-4 py-8 md:py-12">
       {/* Background Decorativo Estilo Stickers */}
