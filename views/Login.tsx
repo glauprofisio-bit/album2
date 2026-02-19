@@ -4,10 +4,9 @@ import { KeyRound, Users, UserCircle, Sparkles, Star, Trophy, Zap, GraduationCap
 
 interface LoginProps {
   onLogin: (user: User) => void;
-  appData: AppData;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
+const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
