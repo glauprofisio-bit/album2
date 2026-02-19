@@ -7,7 +7,7 @@ interface LoginProps {
   appData: AppData;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, appData }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, appData: _appData }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
