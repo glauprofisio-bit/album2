@@ -125,7 +125,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-indigo-700 flex flex-col font-['Fredoka']">
       {!currentUser ? (
-        <Login onLogin={setUser} appData={data} />
+        <Login onLogin={setUser} />
       ) : (
         <>
           <header className="p-4 sticky top-0 z-50">
